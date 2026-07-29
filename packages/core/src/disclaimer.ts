@@ -139,6 +139,39 @@ export const PROJECT_REPO_URL_WARNING =
 export const PROJECT_NAME = 'Follow the Money';
 export const PROJECT_TAGLINE = 'Public money records and public legislative records, side by side.';
 
+/**
+ * ---------------------------------------------------------------------------
+ * WHO PUBLISHED THIS BUILD
+ * ---------------------------------------------------------------------------
+ * A reviewer who was otherwise ready to trust the site stopped at /about,
+ * because no human was named anywhere in it and there was nowhere to report an
+ * error. Anonymity plus a claim of openness reads as evasion whatever the
+ * intent. These three values are what answers that, and they live here — next
+ * to PROJECT_REPO_URL — so /about, the mobile app and any future surface all
+ * state the same thing.
+ *
+ * `PROJECT_CONTACT_URL` is deliberately an issue tracker rather than a personal
+ * email address. It has to be somewhere a reader can actually reach and where
+ * the reply is public, which an inbox is not; and a personal address painted
+ * onto a civic-data site gets scraped. Anyone forking this must replace all
+ * three, or the site credits work to someone who did not publish it.
+ * ---------------------------------------------------------------------------
+ */
+export const PROJECT_MAINTAINER = 'Shreyansh Ojha';
+
+export const PROJECT_CONTACT_LABEL = 'Open an issue on the repository';
+export const PROJECT_CONTACT_URL = 'https://github.com/shreyanshojha/civic-tech/issues';
+
+/**
+ * Stated in full rather than as the single word "unfunded", because the useful
+ * claim is not "no budget" — it is that there is no party, campaign, committee
+ * or industry group with a stake in what this tool says.
+ */
+export const PROJECT_FUNDING =
+  'Nobody. This is unfunded personal work. It takes no money from any political party, '
+  + 'campaign, committee, candidate, industry group or advocacy organisation, and there is '
+  + 'nothing in it to buy.';
+
 // ---------------------------------------------------------------------------
 // PLAIN-LANGUAGE LAYER
 //

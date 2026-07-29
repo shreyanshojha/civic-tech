@@ -11,9 +11,28 @@ build/
 data/*.sqlite
 data/*.sqlite-journal
 data/cache/
-apps/web/public/data/**/*.json
-apps/web/public/data/portraits/
-!apps/web/public/data/.gitkeep
+
+# apps/web/public/data is deliberately NOT ignored.
+#
+# It was, until this project was deployed to a static host. A host that builds
+# from this repository runs `npm run build`, which compiles the app and does not
+# run the pipeline — so the deployed site came up with the app shell and no data
+# behind it, showing the "there is no data here yet" card to every visitor.
+#
+# The alternative was running the whole pipeline inside the host's build. That
+# would mean re-downloading hundreds of megabytes from the FEC and GovInfo on
+# every deploy, a build that fails when a government API has a bad afternoon,
+# and — worst for this project specifically — figures that change silently
+# underneath readers between deploys. For a tool whose entire claim is that
+# every number traces to a named filing, the dataset being a committed,
+# diffable, pinned artifact is a feature and not a workaround.
+#
+# Cost of that choice, stated plainly: about 76 MB across ~2,550 files, of which
+# 29 MB is the 524 member portraits. Refreshing the data is `npm run pipeline`
+# followed by a commit, and the diff is reviewable.
+#
+# The mobile bundle below stays ignored: nothing deploys it, and an Expo build
+# regenerates it from the same pipeline.
 apps/mobile/assets/data/**/*.json
 !apps/mobile/assets/data/.gitkeep
 

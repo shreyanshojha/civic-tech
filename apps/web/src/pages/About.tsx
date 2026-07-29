@@ -19,7 +19,16 @@
  */
 
 import { Link } from 'react-router-dom';
-import { PROJECT_NAME, PROJECT_REPO_URL, PROJECT_REPO_URL_IS_PLACEHOLDER, PROJECT_TAGLINE } from '@ftm/core';
+import {
+  PROJECT_CONTACT_LABEL,
+  PROJECT_CONTACT_URL,
+  PROJECT_FUNDING,
+  PROJECT_MAINTAINER,
+  PROJECT_NAME,
+  PROJECT_REPO_URL,
+  PROJECT_REPO_URL_IS_PLACEHOLDER,
+  PROJECT_TAGLINE,
+} from '@ftm/core';
 import { getIndex } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { LongDisclaimer } from '../components/Framing';
@@ -45,46 +54,39 @@ export default function About() {
           reads as evasion whatever the intent, and it is the cheapest possible
           thing to fix.
 
-          It cannot be filled in from inside the code, because the code does
-          not know who is publishing this copy. So it is a visible, deliberately
-          unmissable TODO rather than a blank: a reader can see that the slot
-          exists and has not been filled, which is a true statement about this
-          build, instead of seeing nothing and concluding it was hidden.
+          The values come from @ftm/core, not from this file, so the mobile app
+          and any future surface answer identically. This block is plain — not
+          amber. Under principle 1 of styles.css the amber caveat colour means
+          "the data has a gap"; who publishes a build is not a data gap, and
+          colouring a person's name as a warning would be its own mistake.
           --------------------------------------------------------------------- */}
       <section className="mt-8">
         <SectionTitle>Who is behind this, and who paid for it</SectionTitle>
-        {/* Amber, and legitimately so under principle 1 of styles.css: this is
-            a gap in what this build can tell the reader, which is the one thing
-            the colour is reserved for. It is not a warning about a person. */}
-        <div className="caveat max-w-measure-wide px-3 py-2.5">
-          <p>
-            <strong className="font-semibold">
-              TODO — whoever publishes this build must fill this section in before it goes public.
-            </strong>{' '}
-            Replace the three lines below with real values. A civic-data site that will not say who
-            made it and who funded it has not earned anybody's trust, and this placeholder is here so
-            that publishing without answering is a visible omission rather than a silent one.
-          </p>
-          <ul className="mt-2 space-y-1">
-            <li>
-              <strong className="font-semibold">Maintainer:</strong> not set — put a real name or a
-              named group here.
-            </li>
-            <li>
-              <strong className="font-semibold">Contact:</strong> not set — an address a reader can
-              actually reach, for corrections and questions.
-            </li>
-            <li>
-              <strong className="font-semibold">Funding:</strong> not set — state who pays for this
-              work, or state plainly that nobody does and it is unfunded personal work.
-            </li>
-          </ul>
-        </div>
+        <dl className="max-w-measure-wide space-y-2.5 text-base leading-relaxed text-ink-2">
+          <div>
+            <dt className="label">Maintainer</dt>
+            <dd className="text-ink-1">{PROJECT_MAINTAINER}</dd>
+          </div>
+          <div>
+            <dt className="label">Contact</dt>
+            <dd>
+              <a className="link" href={PROJECT_CONTACT_URL} target="_blank" rel="noreferrer noopener">
+                {PROJECT_CONTACT_LABEL}
+              </a>
+              . Corrections are the most useful thing you can send. If a figure here disagrees with
+              the filing it links to, the filing is right and this tool is wrong — say so and it
+              gets fixed.
+            </dd>
+          </div>
+          <div>
+            <dt className="label">Who funds it</dt>
+            <dd>{PROJECT_FUNDING}</dd>
+          </div>
+        </dl>
         <p className="mt-3 max-w-measure text-base leading-relaxed text-ink-2">
-          What can be said without knowing who published this copy: the project takes no money from
-          any political party, campaign, committee, candidate, industry group or advocacy
-          organisation, because it takes no money at all — there is nothing to buy and no account to
-          open. It runs on the reader's own machine with the reader's own keys.
+          There is no account to open and no data collected about you. The site runs from files your
+          browser has already downloaded, and any language-model classification runs on the
+          reader's own key.
         </p>
       </section>
 
@@ -100,7 +102,7 @@ export default function About() {
           <li>
             <strong className="font-semibold">2. If this site and that record disagree, this site
             is wrong.</strong> That is a bug in the code here, not a dispute with the agency, and it
-            should be reported to whoever maintains this build using the contact above.
+            should be reported using the contact above.
           </li>
           <li>
             <strong className="font-semibold">3. If the record itself is wrong,</strong> the
