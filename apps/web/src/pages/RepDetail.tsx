@@ -36,6 +36,7 @@ import { getIndex, getMemberDetail } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { useViewMode } from '../lib/view';
 import { CoverageNote, InlineDisclaimer, OverlapScore, SourceLink } from '../components/Framing';
+import { WhatThisMeans } from '../components/WhatThisMeans';
 import { Empty, ErrorState, IndustryBars, Loading, MemberAvatar, MethodTag, PartyTag, SectionTitle, Stat } from '../components/ui';
 import { ShareCardButton } from '../components/ShareCard';
 import { Fold, ViewToggle } from '../components/ViewToggle';
@@ -462,6 +463,16 @@ export default function RepDetail() {
                               </p>
                             </>
                           )}
+                          <WhatThisMeans
+                            overlap={o}
+                            facts={o.meaning}
+                            memberName={member.name}
+                            billLabel={label}
+                            totalDisclosed={donorProfile?.totalItemized ?? 0}
+                            hasVote={votes.length > 0}
+                            classificationMethod={bill?.classificationMethod ?? null}
+                            defaultOpen={!isQuick}
+                          />
                           <div className="mt-3">
                             <ShareCardButton
                               finding={{

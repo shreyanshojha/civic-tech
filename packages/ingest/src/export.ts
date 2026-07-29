@@ -31,6 +31,7 @@ import {
   INDUSTRIES,
   OVERLAP_FORMULA,
   computeOverlap,
+  findOrdinaryExplanations,
 } from '@ftm/core/src';
 import type { BillClassification, DonorProfile, IndustryId, OverlapResult } from '@ftm/core/src';
 import { CONFIG, MOBILE_DATA_DIR, WEB_DATA_DIR, isMain } from './lib/env.js';
@@ -352,6 +353,88 @@ export async function exportBundle(): Promise<void> {
     overlapsByBill.set(b.id, list);
   }
 
+  /**
+   * The two things that turn a bare percentage into something a reader can
+   * actually judge, both computed here so the UI never has to derive them:
+   *
+   *  1. WHERE IT SITS. A 28% means nothing on its own. Against a distribution
+   *     it means "about average", which is the single most useful sentence you
+   *     can put next to a number — and the one most likely to stop someone
+   *     reading a routine figure as a scandal.
+   *  2. WHY IT IS PROBABLY BORING. Committee seat, sponsorship, a sector that
+   *     dominates the whole state's delegation, or a denominator so small the
+   *     percentage is an artefact. All read off the record, never inferred.
+   */
+  const sortedScores = overlaps.map((o) => o.score).sort((a, b) => a - b);
+  const medianScore = sortedScores.length
+    ? sortedScores[Math.floor(sortedScores.length / 2)]!
+    : 0;
+  const percentileOf = (score: number): number => {
+    if (sortedScores.length === 0) return 0;
+    let lo = 0, hi = sortedScores.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (sortedScores[mid]! < score) lo = mid + 1; else hi = mid;
+    }
+    return (lo / sortedScores.length) * 100;
+  };
+  const distribution = { median: medianScore, n: sortedScores.length };
+
+  // Which sector tops each state delegation's donor list, and how often.
+  const topSectorByState = new Map<string, Map<string, number>>();
+  for (const l of legislators) {
+    const top = l.donorSummary?.top?.[0]?.industry;
+    if (!top) continue;
+    const forState = topSectorByState.get(l.state) ?? new Map<string, number>();
+    forState.set(top, (forState.get(top) ?? 0) + 1);
+    topSectorByState.set(l.state, forState);
+  }
+  const stateDelegationSize = new Map<string, number>();
+  for (const l of legislators) stateDelegationSize.set(l.state, (stateDelegationSize.get(l.state) ?? 0) + 1);
+
+  const committeeCodesByMember = new Map<string, Set<string>>();
+  for (const c of committeeRows) {
+    const set = committeeCodesByMember.get(c.bioguide_id) ?? new Set<string>();
+    set.add(c.committee_code);
+    committeeCodesByMember.set(c.bioguide_id, set);
+  }
+  const committeeNameByCode = new Map(committeeRows.map((c) => [c.committee_code, c.committee_name]));
+
+  function meaningFactsFor(
+    o: OverlapResult,
+    bill: BillRow,
+    role: string | null,
+  ) {
+    const member = legByBio.get(o.bioguideId);
+    const profile = donorProfiles.get(o.bioguideId);
+    const billCommittees = parse<string[]>(bill.committee_codes, []);
+    const memberCommittees = committeeCodesByMember.get(o.bioguideId) ?? new Set<string>();
+    // A member sits on a committee of jurisdiction if any of the bill's
+    // committee codes — or their parent full-committee code — matches.
+    const matchedCode = billCommittees.find(
+      (code) => memberCommittees.has(code) || [...memberCommittees].some((mc) => mc.startsWith(code.slice(0, 4))),
+    );
+    const topIndustry = o.matches[0]?.industry ?? null;
+    const stateTop = member ? topSectorByState.get(member.state) : undefined;
+
+    return {
+      percentile: percentileOf(o.score),
+      median: distribution.median,
+      n: distribution.n,
+      ordinary: findOrdinaryExplanations({
+        role,
+        onCommitteeOfJurisdiction: Boolean(matchedCode),
+        committeeName: matchedCode ? committeeNameByCode.get(matchedCode) ?? null : null,
+        topIndustry,
+        state: member?.state ?? null,
+        stateColleaguesWithSameTopSector: topIndustry && stateTop ? Math.max(0, (stateTop.get(topIndustry) ?? 0) - 1) : 0,
+        stateColleagueCount: member ? stateDelegationSize.get(member.state) ?? 0 : 0,
+        totalDisclosed: profile?.totalItemized ?? 0,
+      }),
+      unattributedShare: profile?.unclassifiedShare ?? 0,
+    };
+  }
+
   // --- per-bill detail files ----------------------------------------------
   const legByBio = new Map(legislators.map((l) => [l.bioguideId, l]));
   const billSummaries = billRows.map((b) => {
@@ -413,6 +496,13 @@ export async function exportBundle(): Promise<void> {
             }
           : null,
         donorProfile: donorProfiles.get(o.bioguideId) ?? null,
+        meaning: meaningFactsFor(
+          o,
+          b,
+          b.sponsor_bioguide_id === o.bioguideId ? 'Sponsor'
+            : parse<string[]>(b.cosponsor_bioguide_ids, []).includes(o.bioguideId) ? 'Cosponsor'
+            : 'Committee member',
+        ),
       })),
       votes: votes.filter((v) => v.billId === b.id).map((v) => ({ ...v, positions: v.positions.length })),
       disclaimer: DISCLAIMER_MEDIUM,
@@ -424,6 +514,7 @@ export async function exportBundle(): Promise<void> {
     const profile = donorProfiles.get(l.bioguideId) ?? null;
     const memberOverlaps = (overlapsByMember.get(l.bioguideId) ?? []).sort((a, z) => z.score - a.score).slice(0, 60);
     const billById = new Map(billSummaries.map((b) => [b.id, b]));
+    const billRowById = new Map(billRows.map((b) => [b.id, b]));
     writeJson(WEB_DATA_DIR, `member/${l.bioguideId}.json`, {
       member: l,
       donorProfile: profile,
@@ -438,7 +529,22 @@ export async function exportBundle(): Promise<void> {
             ORDER BY amount DESC LIMIT 40
           `).all(l.bioguideId, cycle)
         : [],
-      overlaps: memberOverlaps.map((o) => ({ ...o, bill: billById.get(o.billId) ?? null })),
+      overlaps: memberOverlaps.map((o) => {
+        const row = billRowById.get(o.billId);
+        return {
+          ...o,
+          bill: billById.get(o.billId) ?? null,
+          meaning: row
+            ? meaningFactsFor(
+                o,
+                row,
+                row.sponsor_bioguide_id === o.bioguideId ? 'Sponsor'
+                  : parse<string[]>(row.cosponsor_bioguide_ids, []).includes(o.bioguideId) ? 'Cosponsor'
+                  : 'Committee member',
+              )
+            : null,
+        };
+      }),
       votes: votes
         .map((v) => {
           const pos = (v.positions as any[]).find((p) => p.bioguideId === l.bioguideId);
@@ -659,6 +765,7 @@ export async function exportBundle(): Promise<void> {
       },
     },
     overlapFormula: OVERLAP_FORMULA,
+    overlapDistribution: { median: distribution.median, n: distribution.n },
     moneyLabel,
     disclaimers: { short: DISCLAIMER_SHORT, medium: DISCLAIMER_MEDIUM, long: DISCLAIMER_LONG },
     coverageNotes,

@@ -39,6 +39,7 @@ import { ShareCardButton } from '../components/ShareCard';
 import { Fold, ViewToggle } from '../components/ViewToggle';
 import { MoneyFlow } from '../components/MoneyFlow';
 import { Term } from '../components/Glossary';
+import { WhatThisMeans } from '../components/WhatThisMeans';
 
 export default function BillDetail() {
   const { id = '' } = useParams();
@@ -319,7 +320,19 @@ export default function BillDetail() {
                         <p className="mt-3 text-sm leading-relaxed text-ink-2">
                           {describeOverlap(o, o.member?.name ?? 'this member', label)}
                         </p>
+
                       )}
+
+                      <WhatThisMeans
+                        overlap={o}
+                        facts={o.meaning}
+                        memberName={o.member?.name ?? 'This member'}
+                        billLabel={prettyLabel}
+                        totalDisclosed={profile?.totalItemized ?? 0}
+                        hasVote={votes.length > 0}
+                        classificationMethod={classification?.method ?? null}
+                        defaultOpen={!isQuick}
+                      />
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <button

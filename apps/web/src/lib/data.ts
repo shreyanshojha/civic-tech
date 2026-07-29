@@ -73,6 +73,14 @@ export interface BillSummary {
   overlapCount: number;
 }
 
+export interface MeaningFacts {
+  percentile: number;
+  median: number;
+  n: number;
+  ordinary: { kind: string; text: string }[];
+  unattributedShare: number;
+}
+
 export interface BillDetail {
   bill: {
     id: string; congress: number; billType: string; billNumber: string; title: string;
@@ -85,6 +93,7 @@ export interface BillDetail {
   overlaps: (OverlapResult & {
     member: { name: string; chamber: string; state: string; district?: string; imageUrl?: string; role: string } | null;
     donorProfile: DonorProfile | null;
+    meaning?: MeaningFacts | null;
   })[];
   votes: { id: string; date: string; question: string; result: string; sourceUrl: string; positions: number }[];
   disclaimer: string;
@@ -94,7 +103,7 @@ export interface MemberDetail {
   member: MemberSummary;
   donorProfile: DonorProfile | null;
   topDonors: { name: string; industry: IndustryId; amount: number; kind: string; sourceUrl: string }[];
-  overlaps: (OverlapResult & { bill: BillSummary | null })[];
+  overlaps: (OverlapResult & { bill: BillSummary | null; meaning?: MeaningFacts | null })[];
   votes: { id: string; billId?: string; date: string; question: string; result: string; position: string; sourceUrl: string }[];
   districtAwards: Award[];
   disclaimer: string;

@@ -230,3 +230,120 @@ describe('plain-language layer', () => {
     expect(plainShare(0.99)).toBe('almost all of it');
   });
 });
+
+import { explainOverlap, findOrdinaryExplanations, plainRatio } from './meaning.js';
+
+describe('the "what does this mean" layer', () => {
+  const base = {
+    score: 0.28,
+    memberName: 'A Member',
+    billLabel: 'H.R. 1',
+    topIndustry: 'agriculture' as const,
+    topIndustryAmount: 19_000,
+    totalDisclosed: 356_000,
+    unattributedShare: 0.3,
+    distribution: { percentile: 55, median: 0.24, n: 3000 },
+    ordinary: [],
+    hasVote: false,
+    classificationMethod: 'llm' as const,
+  };
+
+  it('restates the arithmetic instead of interpreting it', () => {
+    const m = explainOverlap(base);
+    expect(m.inPlainTerms).toContain('$3 of every $10');
+    expect(m.inPlainTerms).toContain('Agriculture');
+  });
+
+  it('never narrates a motive, an accusation, or an implication', () => {
+    // The exhaustive check: every sentence this module can emit, across the
+    // full range of inputs, must be free of causal and accusatory language.
+    const forbidden = /\b(corrupt|bribe|bought|paid off|beholden|captured|in the pocket|influenced by|because of the money|suggests that|raises questions|appears to have|conflict of interest|scandal)\b/i;
+    for (const score of [0, 0.1, 0.3, 0.5, 0.8, 1]) {
+      for (const ordinary of [[], [{ kind: 'committee-seat' as const, text: 'x' }]]) {
+        for (const dist of [null, { percentile: 5, median: 0.2, n: 3000 }, { percentile: 97, median: 0.2, n: 3000 }]) {
+          const m = explainOverlap({ ...base, score, ordinary, distribution: dist });
+          const all = [m.inPlainTerms, m.comparedToOthers ?? '', ...m.ordinaryReasons, ...m.whatWouldMakeItInteresting, m.bottomLine].join(' ');
+          expect(all).not.toMatch(forbidden);
+        }
+      }
+    }
+  });
+
+  it('does not say "about 0 in 100 are higher" at the top of the distribution', () => {
+    const m = explainOverlap({ ...base, distribution: { percentile: 99.92, median: 0.011, n: 3590 } });
+    expect(m.comparedToOthers).not.toMatch(/\b0 in 100\b/);
+    expect(m.comparedToOthers).toMatch(/Fewer than 1 in 100/);
+  });
+
+  it('warns that the comparison set is mostly near-zero, so a high percentile is not extreme', () => {
+    const m = explainOverlap({ ...base, distribution: { percentile: 99, median: 0.011, n: 3590 } });
+    expect(m.comparedToOthers).toMatch(/barely overlap at all/);
+    expect(m.comparedToOthers).toMatch(/easier than it sounds/);
+  });
+
+  it('never uses leaderboard language for the comparison', () => {
+    const high = explainOverlap({ ...base, distribution: { percentile: 99, median: 0.2, n: 3000 } });
+    expect(high.comparedToOthers).not.toMatch(/\b(worst|highest|top of|number one|rank)\b/i);
+    expect(high.comparedToOthers).toContain('in 100');
+  });
+
+  it('suppresses the comparison when the sample is too small to mean anything', () => {
+    expect(explainOverlap({ ...base, distribution: { percentile: 90, median: 0.2, n: 9 } }).comparedToOthers).toBeNull();
+    expect(explainOverlap({ ...base, distribution: null }).comparedToOthers).toBeNull();
+  });
+
+  it('puts the mundane explanation first and lets it lead the bottom line', () => {
+    const m = explainOverlap({
+      ...base, score: 0.8,
+      ordinary: [{ kind: 'committee-seat', text: 'They sit on the committee that handles this bill.' }],
+    });
+    expect(m.ordinaryReasons[0]).toContain('committee');
+    expect(m.bottomLine).toMatch(/plain explanation/i);
+  });
+
+  it('refuses to treat a low score as exoneration', () => {
+    const m = explainOverlap({ ...base, score: 0.02 });
+    expect(m.bottomLine).toMatch(/not a clean bill of health/i);
+  });
+
+  it('warns when the percentage rests on a large unattributed pile', () => {
+    const m = explainOverlap({ ...base, unattributedShare: 0.55 });
+    expect(m.ordinaryReasons.join(' ')).toMatch(/floor, not a measurement/);
+  });
+
+  it('always tells the reader the score ignores the vote', () => {
+    for (const hasVote of [true, false]) {
+      const m = explainOverlap({ ...base, hasVote });
+      expect(m.whatWouldMakeItInteresting.join(' ')).toMatch(/vote/i);
+    }
+    expect(explainOverlap({ ...base, hasVote: true }).whatWouldMakeItInteresting[0]).toMatch(/does not use their vote/);
+  });
+
+  it('derives ordinary explanations only from real fields', () => {
+    const none = findOrdinaryExplanations({
+      role: null, onCommitteeOfJurisdiction: false, topIndustry: 'tech', totalDisclosed: 500_000,
+    });
+    expect(none).toEqual([]);
+
+    const seat = findOrdinaryExplanations({
+      role: 'Sponsor', onCommitteeOfJurisdiction: true, committeeName: 'House Committee on Agriculture',
+      topIndustry: 'agriculture', state: 'IA', stateColleaguesWithSameTopSector: 3, stateColleagueCount: 4,
+      totalDisclosed: 500_000,
+    });
+    expect(seat.map((r) => r.kind)).toEqual(['committee-seat', 'sponsor', 'state-industry']);
+  });
+
+  it('flags a small denominator, because a share of very little is arithmetic not signal', () => {
+    const r = findOrdinaryExplanations({
+      role: null, onCommitteeOfJurisdiction: false, topIndustry: 'tech', totalDisclosed: 25_000,
+    });
+    expect(r[0]!.kind).toBe('small-total');
+  });
+
+  it('phrases ratios so they can be pictured', () => {
+    expect(plainRatio(0)).toBe('none of every $10');
+    expect(plainRatio(0.03)).toBe('less than 50 cents of every $10');
+    expect(plainRatio(0.28)).toBe('about $3 of every $10');
+    expect(plainRatio(0.5)).toBe('about $5 of every $10');
+  });
+});
