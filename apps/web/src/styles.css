@@ -1,0 +1,412 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * DESIGN PRINCIPLES FOR THIS PROJECT — please read before adding styles.
+ *
+ * 1. NO PARTISAN COLOUR. Red and blue are never used to encode party, and party
+ *    is never used to sort, rank, or colour anything. The palette below has no
+ *    saturated red or blue for exactly this reason. A reader must not be able to
+ *    tell at a glance "which side" a page is about.
+ *
+ * 2. NO ALARM COLOURS ON SCORES. A high overlap score is not "bad" and must not
+ *    be rendered in red. All overlap magnitudes use one single-hue ink ramp, so
+ *    the eye reads "more / less", never "good / bad".
+ *
+ * 3. DATA-FORWARD, NOT TABLOID. Numbers get the weight; the chrome recedes.
+ *    No exclamation, no gradients, no drop shadows on data.
+ *
+ * 4. THE DISCLAIMER IS PART OF THE DESIGN, not an afterthought bolted to the
+ *    footer. It has a reserved, permanent place in the layout.
+ *
+ * 5. EVERY TEXT TIER MEETS WCAG AA. --ink-0 through --ink-4 are the text ramp
+ *    and all five clear 4.5:1 on every surface in this file, in both schemes.
+ *    --ink-5/6/7 are structure only: hairlines, bar fills, wells. Never text.
+ *    See apps/web/DESIGN.md for the measured table.
+ */
+
+:root {
+  /* Reserved at the foot of <main> so the sticky framing bar never covers the
+     last rows of a page. It is space GIVEN to the disclaimer, not taken from
+     it — the bar itself is unchanged. */
+  --disclaimer-space: 5.5rem;
+  /* ---- ink ramp -----------------------------------------------------------
+     0–4 are TEXT (all ≥ 4.5:1 on paper, paper-raised, ink-7, accent-soft and
+     caveat-soft). 5–7 are STRUCTURE. Do not set text in 5, 6 or 7. */
+  --ink-0: #0c0d0e;
+  --ink-1: #1c1f22;
+  --ink-2: #383e44;
+  --ink-3: #535a61;
+  --ink-4: #646b72;
+  --ink-5: #8f969b;
+  --ink-6: #d4d9de;
+  --ink-7: #eceff1;
+  --paper: #fbfbfa;
+  --paper-raised: #ffffff;
+
+  /* Border tokens. --line is the receding hairline used to group and separate;
+     --edge is the ≥3:1 border used on anything a reader can actually operate
+     (inputs, selects, buttons), which WCAG 1.4.11 requires to be perceivable. */
+  --line: var(--ink-6);
+  --edge: #8b9298;
+
+  /* One restrained accent. Slate-teal: reads as neither party. */
+  --accent: #1b5551;
+  --accent-soft: #e6efee;
+  --accent-line: #a9c8c4;
+
+  /* Amber is used ONLY for coverage caveats and data-gap notices,
+     never for scores or for any judgement about a person. */
+  --caveat: #6f5313;
+  --caveat-soft: #fbf3e0;
+  --caveat-line: #ddc98e;
+
+  --radius: 6px;
+
+  /* ---- type scale ---------------------------------------------------------
+     Nine steps, each ≥ 8% from its neighbour so a size difference is legible as
+     a difference. Everything in the app must land on one of these. There is no
+     "text-[13px]" any more: six sizes inside a 2.5px band is not a hierarchy,
+     it is noise. Exposed to Tailwind as text-2xs … text-3xl. */
+  --fs-2xs: 0.6875rem;   /* 11.0px — uppercase labels, kbd, dense unit tags   */
+  --fs-xs: 0.78125rem;   /* 12.5px — metadata, provenance, counts             */
+  --fs-sm: 0.84375rem;   /* 13.5px — secondary body, table cells, list detail */
+  --fs-base: 0.9375rem;  /* 15.0px — body prose                               */
+  --fs-md: 1.0625rem;    /* 17.0px — section headings, lead paragraphs        */
+  --fs-lg: 1.25rem;      /* 20.0px — h2 / small figures                       */
+  --fs-xl: 1.5rem;       /* 24.0px — page h1                                  */
+  --fs-2xl: 1.9375rem;   /* 31.0px — detail-page h1, large figures            */
+  --fs-3xl: 2.5rem;      /* 40.0px — home hero only                           */
+
+  /* ---- spacing rhythm -----------------------------------------------------
+     One 4px base unit. Sections are separated by --space-section, blocks inside
+     a section by --space-block, lines inside a block by --space-tight. Using
+     these instead of ad-hoc margins is what keeps long pages scannable. */
+  --space-tight: 0.375rem;   /*  6px */
+  --space-block: 1rem;       /* 16px */
+  --space-section: 2.25rem;  /* 36px */
+
+  /* Height reserved for the persistent disclaimer, so page bottoms and
+     scroll-into-view anchors clear it instead of hiding behind it. */
+  --disclaimer-h: 4.25rem;
+  --header-h: 5.8rem;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink-0: #f4f6f7;
+    --ink-1: #e4e8ea;
+    --ink-2: #c2c9ce;
+    --ink-3: #b1b8be;
+    --ink-4: #8c959c;
+    --ink-5: #5d656c;
+    --ink-6: #333b42;
+    --ink-7: #1f2529;
+    --paper: #14181b;
+    --paper-raised: #1a1f23;
+    --edge: #6a727a;
+    --accent: #78c6be;
+    --accent-soft: #17302e;
+    --accent-line: #33605b;
+    --caveat: #e0c684;
+    --caveat-soft: #2c2617;
+    --caveat-line: #574929;
+  }
+}
+
+html {
+  color-scheme: light dark;
+  /* Anchors and route changes must not park content under the sticky header
+     or behind the sticky disclaimer. */
+  scroll-padding-top: calc(var(--header-h) + 0.5rem);
+  scroll-padding-bottom: calc(var(--disclaimer-h) + 0.5rem);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Tabular numerals everywhere a figure appears, so columns align. */
+.tnum { font-variant-numeric: tabular-nums; }
+
+.serif { font-family: var(--font-serif); }
+.mono { font-family: var(--font-mono); }
+
+a { color: inherit; }
+
+::selection { background: var(--accent-soft); }
+
+/* Focus ring: visible, single colour, never removed. Two rings — the accent
+   plus a paper-coloured spacer — so it stays visible on top of the accent-soft
+   and caveat-soft fills as well as on plain paper. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--paper);
+  border-radius: 3px;
+}
+
+/* PRINCIPLE 3: nothing moves for a reader who asked for less motion. This is a
+   blanket guard so a future contributor cannot add an animation that ignores
+   it — opt back in explicitly with a no-preference query if you ever need to. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The one ramp used to show overlap magnitude. Single hue, varying only in
+   weight — deliberately not a red/green "bad/good" scale. */
+.ramp-0 { background: var(--ink-6); }
+.ramp-1 { background: var(--ink-5); }
+.ramp-2 { background: var(--ink-3); }
+.ramp-3 { background: var(--ink-1); }
+
+@layer components {
+  .card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  /* A card that carries figures rather than prose gets a slightly firmer edge,
+     because in dark mode a 1.4:1 hairline on a raised surface disappears. */
+  .card-data {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--ink-5);
+    border-radius: var(--radius);
+  }
+
+  /* `min-height: 24px` is WCAG 2.2 SC 2.5.8 (Target Size Minimum): a chip was
+     23.5px tall, which fails by half a pixel and is invisible to the eye but not
+     to the success criterion. The extra height goes into the flex centring, so
+     the chip looks the same and is a legal target.
+
+     `white-space: normal` + `max-width: 100%` is the horizontal-overflow fix.
+     A nowrap chip carrying a long label — "Super PAC — funding source not
+     visible", "House Committee on Oversight and Government Reform" — measured
+     314–373px inside a 343px column and pushed the whole document sideways,
+     which is a WCAG 1.4.10 Reflow failure. Wrapping only ever happens when the
+     chip cannot fit on one line, so short tags are unchanged. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.15rem 0.5rem;
+    min-height: 24px;
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: var(--fs-xs);
+    line-height: 1.5;
+    color: var(--ink-2);
+    background: var(--paper-raised);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  /* Some chips carry a whole sentence ("Classified from Library of Congress
+     metadata (no language model)"). Wrapping itself is now the `.chip` default
+     (see above); this is the alignment half — a two- or three-line chip has to
+     top-align and read left, not sit centred like a one-word tag. */
+  .chip-wrap {
+    white-space: normal;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  /* A chip you can press must read as pressable, so it gets the --edge border. */
+  button.chip { border-color: var(--edge); }
+  button.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .chip-active,
+  button.chip-active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* Form controls. Their borders must clear 3:1 — a reader has to be able to
+     see the edge of the thing they are about to type into. */
+  .control {
+    border: 1px solid var(--edge);
+    background: var(--paper-raised);
+    color: var(--ink-1);
+    border-radius: var(--radius);
+  }
+  .control::placeholder { color: var(--ink-4); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--edge);
+    background: var(--paper-raised);
+    color: var(--ink-1);
+    border-radius: var(--radius);
+    font-size: var(--fs-sm);
+    padding: 0.4rem 0.85rem;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: 0.5; }
+
+  /* Coverage caveats. The left rule is load-bearing: it survives a background
+     being washed out in high-contrast mode or in print, where the amber fill
+     does not, so the caveat cannot quietly stop looking like a caveat. */
+  .caveat {
+    background: var(--caveat-soft);
+    border: 1px solid var(--caveat-line);
+    border-left: 3px solid var(--caveat);
+    color: var(--caveat);
+    border-radius: var(--radius);
+    font-size: var(--fs-sm);
+    line-height: 1.55;
+  }
+  .caveat a { color: inherit; }
+  /* A caveat is meant to be read, not skimmed past, so it gets a measure like
+     any other block of prose. */
+  .caveat > p, .caveat > ul, .caveat > ol { max-width: 82ch; }
+
+  /* ---- target size -------------------------------------------------------
+     WCAG 2.2 SC 2.5.8 wants every target to be at least 24×24 CSS px. A review
+     counted 37–40 failures per page here, nearly all of them inline links set
+     in 12–13px text with no vertical padding: 15–20px tall, and on a phone that
+     is a link you miss.
+
+     The fix has to add hit area without adding visual weight, because these
+     links sit inside running prose and any real height change would open the
+     line spacing all over the site. So:
+
+       - on an INLINE box, vertical padding expands the hit area and the
+         element's border box but does *not* affect the line box, so the page
+         lays out to the pixel exactly as before;
+       - on a BLOCK or FLEX-ITEM box the same padding would push things apart,
+         so an equal negative margin cancels it.
+
+     One declaration covers both cases: block margins are ignored on inline
+     boxes, so `.tap-24` is a no-op there and does the cancelling where it is
+     needed. 0.3125rem = 5px each side, which lifts a 14px line to 24px. */
+  .tap-24 {
+    padding-block: 0.3125rem;
+    margin-block: -0.3125rem;
+  }
+
+  .link {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: var(--ink-5);
+    /* Same reasoning as .tap-24 — folded into .link so that the several dozen
+       inline links that already use this class are fixed without touching them
+       one by one. */
+    padding-block: 0.3125rem;
+    margin-block: -0.3125rem;
+  }
+  .link:hover { text-decoration-color: var(--accent); color: var(--accent); }
+
+  .label {
+    font-size: var(--fs-2xs);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  /* Long-form reading measure. Prose wider than about 75 characters loses the
+     reader's place on the line return, and this app has a lot of prose that
+     must actually be read rather than skimmed. */
+  .measure { max-width: 68ch; }
+  .measure-wide { max-width: 82ch; }
+
+  /* Row rhythm for long lists and tables. Zebra is a wash of the well colour
+     rather than a tint of the accent, so it never reads as a state. */
+  .rows > * + * { border-top: 1px solid var(--line); }
+  .zebra > *:nth-child(even) { background: color-mix(in srgb, var(--ink-7) 55%, transparent); }
+  .rows > *:hover { background: color-mix(in srgb, var(--ink-7) 80%, transparent); }
+
+  /* Sticky table head, docked under the sticky page header rather than under
+     the top of the viewport.
+
+     Only applied from `lg` up (see Spending.tsx). Below that the table sits in
+     an `overflow-x-auto` wrapper, and a wrapper that scrolls on one axis is a
+     scroll container on both — so a sticky <th> inside it would offset from the
+     wrapper instead of from the page and land in the middle of the rows. A
+     header stuck to the wrong thing is worse than no sticky header. */
+  .thead-sticky th {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 10;
+    background: var(--paper);
+    border-bottom: 1px solid var(--edge);
+  }
+
+  /* Empty and error states. A dashed well says "nothing here yet" without
+     borrowing the caveat's amber, which is reserved for data-gap meaning. */
+  .well {
+    border: 1px dashed var(--ink-5);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--ink-7) 45%, transparent);
+  }
+
+  /* Loading placeholder. Shimmer only when motion is welcome; the guard above
+     already stops the animation, this keeps the resting state legible. */
+  .skeleton {
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--ink-6) 70%, transparent) 25%,
+      color-mix(in srgb, var(--ink-7) 90%, transparent) 37%,
+      color-mix(in srgb, var(--ink-6) 70%, transparent) 63%);
+    background-size: 400% 100%;
+    border-radius: 3px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton { animation: ftm-shimmer 1.4s ease-in-out infinite; }
+  }
+}
+
+@keyframes ftm-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Horizontal scrollers (the mobile nav, wide tables) get an edge fade so it is
+   obvious there is more to the right. Purely a gradient mask — no script. */
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5rem), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5rem), transparent 100%);
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+
+/* Print: the disclaimer must survive printing and screenshotting. */
+@media print {
+  .no-print { display: none !important; }
+  .print-disclaimer {
+    display: block !important;
+    position: static !important;
+    border: 1px solid #000 !important;
+  }
+  .caveat { border-left-width: 3px !important; }
+}
+
+
+@media (max-width: 640px) {
+  :root { --disclaimer-space: 8.5rem; }
+}

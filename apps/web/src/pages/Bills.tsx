@@ -1,0 +1,233 @@
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { INDUSTRY_BY_ID, shortDate } from '@ftm/core';
+import type { IndustryId } from '@ftm/core';
+import { getBills, getLegislators } from '../lib/data';
+import { useAsync, useDebounced } from '../lib/hooks';
+import { Empty, ErrorState, Loading, MethodTag, SectionTitle } from '../components/ui';
+import { ShortDisclaimer } from '../components/Framing';
+
+type SortKey = 'recent' | 'overlap' | 'cosponsors' | 'title';
+
+export default function Bills() {
+  const { data: bills, error, loading } = useAsync(getBills, []);
+  const { data: legislators } = useAsync(getLegislators, []);
+  const [params, setParams] = useSearchParams();
+
+  const [q, setQ] = useState(params.get('q') ?? '');
+  const debouncedQ = useDebounced(q, 150);
+  const [industry, setIndustry] = useState<IndustryId | 'all'>((params.get('industry') as IndustryId) ?? 'all');
+  const [chamber, setChamber] = useState<'all' | 'house' | 'senate'>('all');
+  const [sort, setSort] = useState<SortKey>('recent');
+  const [onlyClassified, setOnlyClassified] = useState(false);
+  const [limit, setLimit] = useState(60);
+
+  const legByBio = useMemo(() => new Map((legislators ?? []).map((l) => [l.bioguideId, l])), [legislators]);
+
+  const industryCounts = useMemo(() => {
+    const m = new Map<IndustryId, number>();
+    for (const b of bills ?? []) for (const i of b.industries) m.set(i.industry, (m.get(i.industry) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [bills]);
+
+  const filtered = useMemo(() => {
+    if (!bills) return [];
+    const needle = debouncedQ.trim().toLowerCase();
+    // "hr 1234" and "hr1234" should both find H.R. 1234.
+    const numberMatch = /^([a-z]{1,7})\s*\.?\s*(\d+)$/.exec(needle);
+
+    let out = bills.filter((b) => {
+      if (industry !== 'all' && !b.industries.some((i) => i.industry === industry)) return false;
+      if (chamber === 'house' && !/^h/.test(b.billType)) return false;
+      if (chamber === 'senate' && !/^s/.test(b.billType)) return false;
+      if (onlyClassified && b.industries.length === 0) return false;
+      if (!needle) return true;
+      if (numberMatch && b.billType === numberMatch[1] && b.billNumber === numberMatch[2]) return true;
+      return (
+        b.title.toLowerCase().includes(needle) ||
+        `${b.billType} ${b.billNumber}`.includes(needle) ||
+        (b.policyArea ?? '').toLowerCase().includes(needle) ||
+        b.subjects.some((s) => s.toLowerCase().includes(needle)) ||
+        b.committeeNames.some((c) => c.toLowerCase().includes(needle))
+      );
+    });
+
+    out = out.slice().sort((a, b) => {
+      switch (sort) {
+        case 'overlap': return (b.topOverlap?.score ?? -1) - (a.topOverlap?.score ?? -1);
+        case 'cosponsors': return b.cosponsorCount - a.cosponsorCount;
+        case 'title': return a.title.localeCompare(b.title);
+        default: return String(b.latestActionDate ?? '').localeCompare(String(a.latestActionDate ?? ''));
+      }
+    });
+    return out;
+  }, [bills, debouncedQ, industry, chamber, sort, onlyClassified]);
+
+  if (error) return <ErrorState error={error} />;
+
+  const setIndustryFilter = (id: IndustryId | 'all') => {
+    setIndustry(id);
+    setLimit(60);
+    const next = new URLSearchParams(params);
+    if (id === 'all') next.delete('industry'); else next.set('industry', id);
+    setParams(next, { replace: true });
+  };
+
+  return (
+    <div className="mx-auto max-w-content px-4 py-6 pb-14">
+      <h1 className="text-xl font-semibold text-ink-0">Bills</h1>
+      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-3">
+        Legislation from the current Congress, tagged with the sectors it would plausibly affect. Tags
+        are produced by this tool, not by Congress — open any bill to see exactly how its tags were
+        derived and how confident that derivation is.
+      </p>
+      <ShortDisclaimer className="mt-2" />
+
+      {/* ---- controls ---------------------------------------------------- */}
+      <div className="mt-5 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setLimit(60); }}
+            placeholder="Filter by title, number (e.g. hr 1234), subject or committee…"
+            aria-label="Filter bills"
+            className="control h-9 min-w-[16rem] flex-1 px-3 text-sm"
+          />
+          <select
+            value={chamber}
+            onChange={(e) => setChamber(e.target.value as typeof chamber)}
+            aria-label="Chamber"
+            className="control h-9 px-2 text-sm"
+          >
+            <option value="all">Both chambers</option>
+            <option value="house">House</option>
+            <option value="senate">Senate</option>
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            aria-label="Sort by"
+            className="control h-9 px-2 text-sm"
+          >
+            <option value="recent">Most recent action</option>
+            <option value="overlap">Largest overlap</option>
+            <option value="cosponsors">Most cosponsors</option>
+            <option value="title">Title A–Z</option>
+          </select>
+          {/* The <label> wraps the box, so the whole row is the target — which is
+              what WCAG 2.2 SC 2.5.8 measures. It was 20px tall with a 13px box;
+              min-h-6 takes the target to 24 and the box up to 18 without turning
+              a 13.5px control row into a chunky one. */}
+          <label className="flex min-h-6 items-center gap-2 text-sm text-ink-3">
+            <input
+              type="checkbox"
+              checked={onlyClassified}
+              onChange={(e) => setOnlyClassified(e.target.checked)}
+              className="h-[1.125rem] w-[1.125rem] shrink-0"
+            />
+            Only bills with a sector tag
+          </label>
+        </div>
+
+        <div className="flex max-h-[7.5rem] flex-wrap gap-1.5 overflow-y-auto md:max-h-none">
+          <button type="button" onClick={() => setIndustryFilter('all')} className={`chip ${industry === 'all' ? 'chip-active' : ''}`}>
+            All sectors <span className="tnum text-ink-4">{bills?.length ?? 0}</span>
+          </button>
+          {industryCounts.map(([id, n]) => (
+            <button key={id} type="button" onClick={() => setIndustryFilter(id)} className={`chip ${industry === id ? 'chip-active' : ''}`} title={INDUSTRY_BY_ID[id]?.blurb}>
+              {INDUSTRY_BY_ID[id]?.label ?? id} <span className="tnum text-ink-4">{n}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ---- results ----------------------------------------------------- */}
+      <div className="mt-6">
+        <SectionTitle note={`${filtered.length.toLocaleString()} of ${(bills?.length ?? 0).toLocaleString()}`}>
+          Results
+        </SectionTitle>
+        <p className="mb-3 max-w-measure-wide text-xs leading-relaxed text-ink-3">
+          The percentage on a sector chip is <strong className="font-semibold">classifier
+          confidence</strong> — how sure this tool is that the bill touches that sector. It is not an
+          overlap score and says nothing about any member.
+        </p>
+
+        {loading ? (
+          <Loading what="bills" />
+        ) : filtered.length === 0 ? (
+          <Empty>No bills match those filters. Try clearing the sector filter or the search text.</Empty>
+        ) : (
+          <>
+            <ul className="rows -mx-2">
+              {filtered.slice(0, limit).map((b) => {
+                const sponsor = b.sponsorBioguideId ? legByBio.get(b.sponsorBioguideId) : undefined;
+                return (
+                  <li key={b.id} className="px-2 py-3">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <Link to={`/bills/${b.id}`} className="tap-24 mono shrink-0 text-xs text-ink-4 hover:text-accent">
+                        {b.billType.toUpperCase()} {b.billNumber}
+                      </Link>
+                      <Link to={`/bills/${b.id}`} className="tap-24 max-w-measure-wide text-base leading-snug text-ink-1 hover:text-accent">
+                        {b.title}
+                      </Link>
+                    </div>
+
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
+                      {sponsor && (
+                        <span>
+                          Sponsor{' '}
+                          <Link className="link" to={`/reps/${sponsor.bioguideId}`}>{sponsor.name}</Link>
+                        </span>
+                      )}
+                      <span>{b.cosponsorCount} cosponsors</span>
+                      {b.latestActionDate && <span>Last action {shortDate(b.latestActionDate)}</span>}
+                      {b.policyArea && <span>· {b.policyArea}</span>}
+                      {b.overlapCount > 0 && (
+                        <span className="text-ink-3">
+                          {b.overlapCount} member{b.overlapCount === 1 ? '' : 's'} with overlapping donor sectors
+                        </span>
+                      )}
+                    </div>
+
+                    {b.industries.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {b.industries.slice(0, 5).map((i) => (
+                          <button
+                            key={i.industry}
+                            type="button"
+                            onClick={() => setIndustryFilter(i.industry)}
+                            className="chip"
+                            title={`${INDUSTRY_BY_ID[i.industry]?.blurb ?? ''} — classifier confidence ${Math.round(i.confidence * 100)}%. This is how sure the tagger is, not an overlap score.`}
+                          >
+                            <span>
+                              tagged {INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}{' '}
+                              <span className="tnum text-ink-4">· confidence {Math.round(i.confidence * 100)}%</span>
+                            </span>
+                          </button>
+                        ))}
+                        <MethodTag method={b.classificationMethod} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {filtered.length > limit && (
+              <div className="mt-5 text-center">
+                <button
+                  type="button"
+                  onClick={() => setLimit((l) => l + 100)}
+                  className="btn"
+                >
+                  Show {Math.min(100, filtered.length - limit)} more
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

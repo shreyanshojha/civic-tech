@@ -1,0 +1,31 @@
+{
+  "name": "@ftm/ingest",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fec": "tsx src/fec.ts",
+    "congress": "tsx src/congress.ts",
+    "usaspending": "tsx src/usaspending.ts",
+    "classify": "tsx src/classify.ts",
+    "export": "tsx src/export.ts",
+    "sample": "tsx src/make-sample.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ftm/core": "*",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "fast-xml-parser": "^4.5.7",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

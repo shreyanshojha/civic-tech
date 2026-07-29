@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.env
+.env.local
+*.local
+
+# Local data artifacts — regenerate with `npm run pipeline`
+data/*.sqlite
+data/*.sqlite-journal
+data/cache/
+apps/web/public/data/**/*.json
+apps/web/public/data/portraits/
+!apps/web/public/data/.gitkeep
+apps/mobile/assets/data/**/*.json
+!apps/mobile/assets/data/.gitkeep
+
+# OS noise
+.DS_Store
+Thumbs.db

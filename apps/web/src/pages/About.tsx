@@ -1,0 +1,246 @@
+/**
+ * What this project is.
+ *
+ * ---------------------------------------------------------------------------
+ * VOICE RULES FOR THIS FILE — please keep them if you edit it.
+ *
+ * This is a personal open-source project, MIT licensed. It is not an
+ * organisation, has no staff, sells nothing, and hosts nothing. The page is
+ * therefore written in neutral third person — "this project", "the pipeline",
+ * "the reader" — and never in a corporate first person plural. Marketing
+ * vocabulary is out of place here: there is nobody to market to, and implying
+ * otherwise would misrepresent what somebody is downloading.
+ *
+ * It also matters that no hosted service is implied anywhere. Somebody reading
+ * this is running a copy on their own machine, holding their own keys, with no
+ * account and nothing reporting back. Any sentence that suggests otherwise is a
+ * factual error about the software, not a style preference.
+ * ---------------------------------------------------------------------------
+ */
+
+import { Link } from 'react-router-dom';
+import { PROJECT_NAME, PROJECT_REPO_URL, PROJECT_REPO_URL_IS_PLACEHOLDER, PROJECT_TAGLINE } from '@ftm/core';
+import { getIndex } from '../lib/data';
+import { useAsync } from '../lib/hooks';
+import { LongDisclaimer, ShortDisclaimer } from '../components/Framing';
+import { Empty, ErrorState, Loading, SectionTitle } from '../components/ui';
+
+export default function About() {
+  const { data: idx, error, loading } = useAsync(getIndex, []);
+
+  return (
+    <div className="mx-auto max-w-content px-4 py-6 pb-14">
+      <h1 className="text-xl font-semibold text-ink-0">About {PROJECT_NAME}</h1>
+      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">{PROJECT_TAGLINE}</p>
+      <ShortDisclaimer className="mt-2" />
+
+      {/* ---- what it is --------------------------------------------------- */}
+      <section className="mt-8">
+        <SectionTitle>What this is</SectionTitle>
+        <div className="max-w-measure space-y-3 text-base leading-relaxed text-ink-2">
+          <p>
+            This is a personal open-source project, released under the MIT licence. It is not an
+            organisation, not a business, and not a service anybody operates on somebody else's
+            behalf. There is nothing to buy, nothing to subscribe to, and nobody to bill.
+          </p>
+          <p>
+            It does one narrow thing. It downloads public government filings — campaign-finance
+            records from the Federal Election Commission, legislative records from Congress, federal
+            award records from USASpending — normalises them into one local database, and puts the
+            money next to the legislation so a reader can see where the two touch. That is the entire
+            scope. It does not tell anybody why a vote happened, because it cannot know.
+          </p>
+          <p>
+            The reason it exists is that both halves of this data have always been public and neither
+            half has ever been easy to hold in one hand. Joining them is not hard; it is just tedious,
+            and it had not been done in a form somebody could run for themselves, inspect line by
+            line, and disagree with.
+          </p>
+        </div>
+      </section>
+
+      {/* ---- how it runs --------------------------------------------------- */}
+      <section className="mt-10">
+        <SectionTitle>How it runs</SectionTitle>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="card p-4">
+            <div className="label mb-1.5">On the reader's own machine</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              The pipeline runs locally. It fetches from government sources into a local SQLite file,
+              computes everything at build time, and writes a folder of plain JSON. What is on screen
+              right now was rendered from files sitting on the machine serving this page — there is no
+              query API, no database connection from the browser, and no backend involved in drawing
+              any view here.
+            </p>
+          </div>
+          <div className="card p-4">
+            <div className="label mb-1.5">With the reader's own keys</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              A first run needs no API keys at all: three of the four sources publish bulk files or
+              open endpoints with no signup, and the fourth is public-domain data. Keys are strictly
+              additive and always belong to whoever is running the pipeline. Nothing in the repository
+              ships a key, falls back to a shared key, or borrows anybody else's quota — if a key is
+              missing, the script explains how to obtain a free one and stops.
+            </p>
+          </div>
+          <div className="card p-4">
+            <div className="label mb-1.5">No account, no telemetry, no server</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              There is nothing to sign up for, because there is nothing to sign up to. No analytics,
+              no error reporting, no usage tracking, no cookies for identity, nothing phoning home.
+              Search runs entirely in the browser against a prebuilt index, so a typed query never
+              leaves the device. The one exception is an optional address lookup that only runs when a
+              reader explicitly triggers it, and which says so on screen before it does.
+            </p>
+          </div>
+          <div className="card p-4">
+            <div className="label mb-1.5">Portable on purpose</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              The build output is a folder of static files. It works opened straight off a disk with
+              no server at all, and on any static host with no rewrite rules — which is why routing
+              here uses hashes. Running this should cost nobody anything and should not depend on
+              anybody staying online, including whoever wrote it.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- what it deliberately does not do -------------------------------- */}
+      <section className="mt-10">
+        <SectionTitle>Deliberate constraints</SectionTitle>
+        <ul className="max-w-measure space-y-2.5 text-base leading-relaxed text-ink-2">
+          <li>
+            · <strong className="font-semibold">Party is never a colour.</strong> Party affiliation is
+            stored and displayed as a plain factual letter, and is never used to sort, rank, filter or
+            colour anything. The palette contains no saturated red or blue for exactly this reason: a
+            reader should not be able to tell “which side” a page is about at a glance.
+          </li>
+          <li>
+            · <strong className="font-semibold">A score is never an alarm.</strong> Overlap magnitudes
+            use one neutral ink ramp, so the eye reads “more or less”, never “good or bad”. A high
+            overlap is common and frequently has an entirely ordinary explanation.
+          </li>
+          <li>
+            · <strong className="font-semibold">Framing travels with the data.</strong> Every
+            disclaimer string comes from one file in the core package. Nothing writes its own wording,
+            so the framing cannot be softened in one view without being softened everywhere — and a
+            test fails when a view stops rendering it. The banner at the bottom of every page has no
+            dismiss button on purpose.
+          </li>
+          <li>
+            · <strong className="font-semibold">Every figure is traceable.</strong> Each stored record
+            keeps the government's own identifier, a deep link to the primary filing, and the time it
+            was fetched. Any number on screen is one click from the record it came from.
+          </li>
+          <li>
+            · <strong className="font-semibold">Uncertainty is shown, not smoothed.</strong> Money that
+            could not be attributed to a sector is reported as its own visible figure rather than
+            being quietly dropped or guessed at, and each classification records which method produced
+            it.
+          </li>
+        </ul>
+      </section>
+
+      {/* ---- the claim ------------------------------------------------------- */}
+      <section className="mt-10">
+        <SectionTitle>The claim this project makes, in full</SectionTitle>
+        <div className="max-w-3xl">
+          <LongDisclaimer />
+        </div>
+        <p className="mt-4 max-w-measure-wide text-sm leading-relaxed text-ink-3">
+          Two pages are worth reading before anything here is used for anything:{' '}
+          <Link className="link" to="/methodology">how the numbers work</Link>, which walks through
+          every derivation and works one score out by hand, and{' '}
+          <Link className="link" to="/limitations">what this tool cannot do</Link>, which is specific
+          about the conclusions this data cannot support however the figures look.
+        </p>
+      </section>
+
+      {/* ---- licence and contributions ---------------------------------------- */}
+      <section className="mt-10">
+        <SectionTitle>Licence, source and contributions</SectionTitle>
+        <div className="max-w-measure space-y-3 text-base leading-relaxed text-ink-2">
+          {/* A hyperlink to a placeholder is worse than no hyperlink: it looks
+              like provenance and resolves to nothing. While PROJECT_REPO_URL is
+              unset, say so instead of rendering a dead link. */}
+          {PROJECT_REPO_URL_IS_PLACEHOLDER ? (
+            <p>
+              MIT licensed. This build has no public source URL set, so there is nothing to link to
+              here yet — the address lives in{' '}
+              <span className="mono">packages/core/src/disclaimer.ts</span> as{' '}
+              <span className="mono">PROJECT_REPO_URL</span> and whoever publishes this build has to
+              fill it in. Anybody with the source is free to run it, fork it, correct it, or take it
+              somewhere else entirely.
+            </p>
+          ) : (
+            <p>
+              MIT licensed. The source is public at{' '}
+              <a className="link" href={`https://${PROJECT_REPO_URL}`} target="_blank" rel="noreferrer noopener">
+                {PROJECT_REPO_URL}
+              </a>
+              . Anybody is free to run it, fork it, correct it, or take it somewhere else entirely.
+            </p>
+          )}
+          <p>
+            The parts most worth contributing to are the ones a regular expression cannot reach: the
+            curated table of organisations whose sector is not readable from the name, and the sector
+            taxonomy itself. Entries there must cite a public source, must classify an economic
+            interest rather than a political side, and must fall back to “funding source not visible”
+            when the truth is that the funding is genuinely not visible. Corrections to the underlying
+            government data belong with the agency that published it, and every page here links to the
+            record so that is possible.
+          </p>
+          <p>
+            Government filings are public records. The sector taxonomy in this repository is built from
+            raw disclosure text rather than licensed from anybody, which makes it noisier than
+            hand-coded commercial datasets — that trade is made deliberately, and it is the reason all
+            of this can be given away.
+          </p>
+        </div>
+      </section>
+
+      {/* ---- this bundle -------------------------------------------------------- */}
+      <section className="mt-10">
+        <SectionTitle>The copy of the data you are reading</SectionTitle>
+        {error ? (
+          <ErrorState error={error} />
+        ) : loading ? (
+          <Loading what="bundle details" />
+        ) : !idx ? (
+          <Empty>No bundle metadata is available for this copy of the data.</Empty>
+        ) : (
+          <dl className="grid max-w-3xl grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+            <div className="flex justify-between gap-3 border-b border-line py-1">
+              <dt className="text-ink-4">Generated</dt>
+              <dd className="tnum text-ink-2">{new Date(idx.generatedAt).toLocaleString()}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-line py-1">
+              <dt className="text-ink-4">Coverage</dt>
+              <dd className="tnum text-ink-2">FEC cycle {idx.cycle} · {idx.congress}th Congress</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-line py-1">
+              <dt className="text-ink-4">Campaign finance</dt>
+              <dd className="mono text-ink-2">{idx.sources.openfec}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-line py-1">
+              <dt className="text-ink-4">Legislation</dt>
+              <dd className="mono text-ink-2">{idx.sources.congress}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-line py-1">
+              <dt className="text-ink-4">Classification</dt>
+              <dd className="mono text-ink-2">{idx.sources.classification}</dd>
+            </div>
+            <div className="flex justify-between gap-3 border-b border-line py-1">
+              <dt className="text-ink-4">Origin</dt>
+              <dd className="text-ink-2">{idx.isSample ? 'Checked-in sample data' : 'Fetched from primary sources'}</dd>
+            </div>
+          </dl>
+        )}
+        <p className="mt-4 text-sm text-ink-4">
+          <Link className="link" to="/methodology">How the numbers work →</Link> ·{' '}
+          <Link className="link" to="/limitations">What this cannot do →</Link>
+        </p>
+      </section>
+    </div>
+  );
+}

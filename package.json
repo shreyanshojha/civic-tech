@@ -1,0 +1,33 @@
+{
+  "name": "follow-the-money",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Open-source, bring-your-own-API-key tool for exploring publicly disclosed money-in-politics data alongside legislative activity. Shows patterns, not proof.",
+  "workspaces": [
+    "packages/core",
+    "packages/ingest",
+    "apps/web"
+  ],
+  "scripts": {
+    "build:core": "npm run build -w @ftm/core",
+    "ingest:fec": "npm run fec -w @ftm/ingest",
+    "ingest:congress": "npm run congress -w @ftm/ingest",
+    "ingest:usaspending": "npm run usaspending -w @ftm/ingest",
+    "classify": "npm run classify -w @ftm/ingest",
+    "export": "npm run export -w @ftm/ingest",
+    "pipeline": "npm run ingest:fec && npm run ingest:congress && npm run ingest:usaspending && npm run classify && npm run export",
+    "dev": "npm run dev -w @ftm/web",
+    "build": "npm run build:core && npm run build -w @ftm/web",
+    "preview": "npm run preview -w @ftm/web",
+    "test": "npm run test -w @ftm/core && npm run test -w @ftm/ingest",
+    "audit:repo": "node scripts/audit-repo.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0",
+    "typescript": "^5.6.3"
+  }
+}
