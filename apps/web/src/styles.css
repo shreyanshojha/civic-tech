@@ -365,6 +365,95 @@ a { color: inherit; }
     background: color-mix(in srgb, var(--ink-7) 45%, transparent);
   }
 
+  /* ---- folds -------------------------------------------------------------
+     "Short by default, depth on demand" needs a container, and native
+     <details> is that container: it works with no JavaScript, it is in the
+     accessibility tree for free, and the browser's own in-page search opens it.
+     A folded block is one tap from open and is never removed from the page.
+
+     The summary row is a real 32px target (SC 2.5.8 wants 24) because on a
+     phone this is the control the whole layering idea depends on. */
+  .fold {
+    border-top: 1px solid var(--line);
+  }
+  .fold-summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-height: 32px;
+    padding-block: 0.4rem;
+    cursor: pointer;
+    list-style: none;
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--ink-1);
+  }
+  .fold-summary::-webkit-details-marker { display: none; }
+  .fold-summary:hover { color: var(--accent); }
+  .fold-marker { transform: translateY(1px); color: var(--ink-4); }
+  .fold[open] > .fold-summary .fold-marker { transform: translateY(1px) rotate(90deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .fold-marker { transition: transform 120ms ease; }
+  }
+
+  /* ---- inline glossary ---------------------------------------------------
+     A term of art, glossed where it is used. The dotted underline says "this
+     word has a definition" without the visual weight of a link, and the little
+     question mark says it on a device with no hover. The definition opens
+     inline, capped at the container width, so a long one can never push the
+     document sideways. */
+  /* The word and its marker never split across a line. The wrapper itself must
+     NOT be nowrap: the definition it can contain is a whole sentence, and a
+     nowrap sentence pushes the document sideways (measured: 385px inside a
+     375px viewport, a WCAG 1.4.10 failure). */
+  .term-wrap { display: inline; }
+  .term-btn {
+    display: inline;
+    white-space: nowrap;
+    border-bottom: 1px dotted var(--ink-4);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+  }
+  .term-btn:hover { color: var(--accent); border-bottom-color: var(--accent); }
+  /* Not a superscript: on 12.5px metadata text a raised glyph collides with
+     the line above it. Same size, same baseline, quieter colour. */
+  .term-mark {
+    margin-left: 0.15em;
+    font-size: 0.85em;
+    color: var(--ink-4);
+  }
+  .term-def {
+    display: inline-block;
+    max-width: 100%;
+    margin: 0.25rem 0;
+    padding: 0.35rem 0.55rem;
+    border-left: 2px solid var(--accent-line);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  /* ---- entry cards -------------------------------------------------------
+     The three doors on the home page. Big, obviously pressable, one sentence
+     each. The hover only moves the arrow, never the card, so the layout cannot
+     shift under a reader's finger. */
+  .entry-card {
+    display: block;
+    background: var(--paper-raised);
+    border: 1px solid var(--edge);
+    border-radius: var(--radius);
+    padding: 1rem;
+    min-height: 6.5rem;
+  }
+  .entry-card:hover { border-color: var(--accent); }
+  .entry-card:hover .entry-arrow { transform: translateX(3px); }
+  @media (prefers-reduced-motion: no-preference) {
+    .entry-arrow { transition: transform 120ms ease; }
+  }
+
   /* Loading placeholder. Shimmer only when motion is welcome; the guard above
      already stops the animation, this keeps the resting state legible. */
   .skeleton {

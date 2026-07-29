@@ -49,6 +49,8 @@ import type { Industry, IndustryId } from '@ftm/core';
 import { getAwards, getBills, getIndustries, getLegislators } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { CoverageNote, ShortDisclaimer } from '../components/Framing';
+import { Fold, ViewToggle } from '../components/ViewToggle';
+import { useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, SectionTitle, Stat } from '../components/ui';
 
 type SortKey = 'money' | 'bills' | 'awards' | 'members' | 'label';
@@ -76,6 +78,7 @@ export default function Industries() {
   const awards = useAsync(getAwards, []);
 
   const [sort, setSort] = useState<SortKey>('money');
+  const { isQuick } = useViewMode();
 
   const taxonomy = industries.data ?? INDUSTRIES;
 
@@ -145,27 +148,35 @@ export default function Industries() {
   return (
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">Sectors</h1>
-      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-3">
-        A deliberately coarse taxonomy of {taxonomy.length} buckets, built in this repository from raw
-        disclosure text rather than licensed from anyone. Every bucket links to the bills tagged with
-        it, the members whose disclosed funding it makes up the largest share of, and the federal
-        money flowing the other way.
+      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">
+        {taxonomy.length} broad groups of employers. Pick one to see the bills it touches, the
+        members it funds most, and the federal money going the other way. The groups are rough on
+        purpose — they are built from what donors write on their own filings.
       </p>
-      <ShortDisclaimer className="mt-2" />
+      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      <ViewToggle className="mt-3" />
 
       {/* ---- headline figures ------------------------------------------- */}
       <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-4">
-        <Stat label="Sectors" value={sectorRows.length} sub="Excluding the non-industry buckets below" />
+        <Stat label="Sectors" value={sectorRows.length} sub="Not counting the three groups below that are not industries." />
         <Stat
           label="Money counted here"
           value={usd(totals.counted, { compact: true })}
-          sub={`A floor. ${(totals.share * 100).toFixed(0)}% of the ${usd(totals.attributed, { compact: true })} disclosed to sitting members.`}
+          sub={`At least this much. It is ${(totals.share * 100).toFixed(0)}% of the ${usd(totals.attributed, { compact: true })} reported to sitting members — see the note below.`}
         />
-        <Stat label="Bills tagged" value={(bills.data ?? []).filter((b) => b.industries.length > 0).length.toLocaleString()} sub={`of ${(bills.data ?? []).length.toLocaleString()} bills in the bundle`} />
-        <Stat label="Federal awards" value={(awards.data ?? []).length.toLocaleString()} sub="Context only — see Federal spending" />
+        <Stat label="Bills tagged" value={(bills.data ?? []).filter((b) => b.industries.length > 0).length.toLocaleString()} sub={`out of ${(bills.data ?? []).length.toLocaleString()} bills here`} />
+        <Stat label="Federal awards" value={(awards.data ?? []).length.toLocaleString()} sub="Background only. Not linked to any donation." />
       </div>
 
       <div className="mt-5">
+      <CoverageNote>
+        <strong className="font-semibold">Read the money column as “at least this much”.</strong>{' '}
+        Some of the money is missing from every row below — about{' '}
+        {((1 - totals.share) * 100).toFixed(0)}% of it.
+      </CoverageNote>
+      </div>
+
+      <Fold className="mt-3" open={!isQuick} title="Why some of the money is missing here">
       <CoverageNote>
         <strong className="font-semibold">Read the money column as “at least this much”.</strong> The
         bundle ships only each member's three largest donor sectors in the shared file this page
@@ -175,17 +186,14 @@ export default function Industries() {
         sectors that dominate a few members' funding. The complete, untruncated breakdown for any
         individual is on that member's own page.
       </CoverageNote>
-      </div>
+      </Fold>
 
       {/* ---- the non-industry buckets ------------------------------------ */}
       <section className="mt-8">
-        <SectionTitle>Three of these buckets are not industries</SectionTitle>
-        <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-3">
-          Political money and public money both show up in campaign-finance filings, and both would
-          quietly distort every sector figure on this site if they were folded into an industry. They
-          are kept separate on purpose, so that “this sector funded that member” never silently means
-          “a party committee did” or “a public agency did”. They are listed here, and they are ranked
-          alongside the sectors below, but they answer a different question.
+        <SectionTitle>Three of these groups are not industries</SectionTitle>
+        <p className="mb-3 max-w-measure-wide text-base leading-relaxed text-ink-2">
+          Party money and public money turn up in the same filings. They are kept apart so that “this
+          industry funded that member” never quietly means “a party committee did”.
         </p>
         <ul className="grid gap-3 sm:grid-cols-3">
           {bucketRows.map((r) => (
@@ -253,9 +261,9 @@ export default function Industries() {
         </SectionTitle>
 
         {loading ? (
-          <Loading what="sectors" />
+          <Loading what="the list of sectors" />
         ) : sectorRows.length === 0 ? (
-          <Empty>No sectors in this bundle. Run the pipeline once to generate the data.</Empty>
+          <Empty>No sectors are in this data yet. Run the pipeline once to build it.</Empty>
         ) : (
           <ul className="divide-y divide-line">
             {sectorRows.map((r) => (
@@ -283,7 +291,7 @@ export default function Industries() {
                     {r.bills} bill{r.bills === 1 ? '' : 's'} tagged
                   </span>
                   <span className="tnum">
-                    top-three donor sector for {r.members} member{r.members === 1 ? '' : 's'}
+                    a top-three funder for {r.members} member{r.members === 1 ? '' : 's'}
                   </span>
                   {r.awardCount > 0 && (
                     <span className="tnum">

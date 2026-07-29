@@ -6,6 +6,9 @@ import { getBills, getLegislators } from '../lib/data';
 import { useAsync, useDebounced } from '../lib/hooks';
 import { Empty, ErrorState, Loading, MethodTag, SectionTitle } from '../components/ui';
 import { ShortDisclaimer } from '../components/Framing';
+import { ViewToggle } from '../components/ViewToggle';
+import { Term } from '../components/Glossary';
+import { parseView, useViewMode } from '../lib/view';
 
 type SortKey = 'recent' | 'overlap' | 'cosponsors' | 'title';
 
@@ -13,14 +16,15 @@ export default function Bills() {
   const { data: bills, error, loading } = useAsync(getBills, []);
   const { data: legislators } = useAsync(getLegislators, []);
   const [params, setParams] = useSearchParams();
+  const { isQuick } = useViewMode();
 
   const [q, setQ] = useState(params.get('q') ?? '');
   const debouncedQ = useDebounced(q, 150);
   const [industry, setIndustry] = useState<IndustryId | 'all'>((params.get('industry') as IndustryId) ?? 'all');
   const [chamber, setChamber] = useState<'all' | 'house' | 'senate'>('all');
   const [sort, setSort] = useState<SortKey>('recent');
-  const [onlyClassified, setOnlyClassified] = useState(false);
-  const [limit, setLimit] = useState(60);
+  const [onlyClassified, setOnlyClassified] = useState(isQuick);
+  const [limit, setLimit] = useState(parseView(params.get('view')) === 'quick' ? 20 : 60);
 
   const legByBio = useMemo(() => new Map((legislators ?? []).map((l) => [l.bioguideId, l])), [legislators]);
 
@@ -76,12 +80,12 @@ export default function Bills() {
   return (
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">Bills</h1>
-      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-3">
-        Legislation from the current Congress, tagged with the sectors it would plausibly affect. Tags
-        are produced by this tool, not by Congress — open any bill to see exactly how its tags were
-        derived and how confident that derivation is.
+      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">
+        Bills from the Congress sitting now. Each one is tagged with the industries it would affect.
+        This tool adds those tags, not Congress. Open any bill to see what it does in plain words.
       </p>
-      <ShortDisclaimer className="mt-2" />
+      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      <ViewToggle className="mt-3" />
 
       {/* ---- controls ---------------------------------------------------- */}
       <div className="mt-5 space-y-3">
@@ -90,7 +94,7 @@ export default function Bills() {
             type="search"
             value={q}
             onChange={(e) => { setQ(e.target.value); setLimit(60); }}
-            placeholder="Filter by title, number (e.g. hr 1234), subject or committee…"
+            placeholder="Search a title, a number like hr 1234, or a subject…"
             aria-label="Filter bills"
             className="control h-9 min-w-[16rem] flex-1 px-3 text-sm"
           />
@@ -126,7 +130,7 @@ export default function Bills() {
               onChange={(e) => setOnlyClassified(e.target.checked)}
               className="h-[1.125rem] w-[1.125rem] shrink-0"
             />
-            Only bills with a sector tag
+            Only bills with an industry tag
           </label>
         </div>
 
@@ -147,16 +151,19 @@ export default function Bills() {
         <SectionTitle note={`${filtered.length.toLocaleString()} of ${(bills?.length ?? 0).toLocaleString()}`}>
           Results
         </SectionTitle>
-        <p className="mb-3 max-w-measure-wide text-xs leading-relaxed text-ink-3">
-          The percentage on a sector chip is <strong className="font-semibold">classifier
-          confidence</strong> — how sure this tool is that the bill touches that sector. It is not an
-          overlap score and says nothing about any member.
+        <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
+          The percentage on an industry tag is{' '}
+          <Term k="confidence">how sure this tool is</Term> that the bill touches that industry. It
+          is not an overlap number, and it says nothing about any member.
         </p>
 
         {loading ? (
-          <Loading what="bills" />
+          <Loading what="the list of bills" />
         ) : filtered.length === 0 ? (
-          <Empty>No bills match those filters. Try clearing the sector filter or the search text.</Empty>
+          <Empty>
+            No bills match what you picked. Try clearing the industry filter, or typing less in the
+            search box — a last name or a bill number like “hr 1234” works well.
+          </Empty>
         ) : (
           <>
             <ul className="rows -mx-2">
@@ -180,12 +187,12 @@ export default function Bills() {
                           <Link className="link" to={`/reps/${sponsor.bioguideId}`}>{sponsor.name}</Link>
                         </span>
                       )}
-                      <span>{b.cosponsorCount} cosponsors</span>
+                      <span>{b.cosponsorCount} <Term k="cosponsor">cosponsors</Term></span>
                       {b.latestActionDate && <span>Last action {shortDate(b.latestActionDate)}</span>}
                       {b.policyArea && <span>· {b.policyArea}</span>}
                       {b.overlapCount > 0 && (
                         <span className="text-ink-3">
-                          {b.overlapCount} member{b.overlapCount === 1 ? '' : 's'} with overlapping donor sectors
+                          {b.overlapCount} member{b.overlapCount === 1 ? '' : 's'} whose donors are in these industries
                         </span>
                       )}
                     </div>
@@ -198,11 +205,11 @@ export default function Bills() {
                             type="button"
                             onClick={() => setIndustryFilter(i.industry)}
                             className="chip"
-                            title={`${INDUSTRY_BY_ID[i.industry]?.blurb ?? ''} — classifier confidence ${Math.round(i.confidence * 100)}%. This is how sure the tagger is, not an overlap score.`}
+                            title={`${INDUSTRY_BY_ID[i.industry]?.blurb ?? ''} — this tool is ${Math.round(i.confidence * 100)}% sure of the tag. That is not an overlap number.`}
                           >
                             <span>
                               tagged {INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}{' '}
-                              <span className="tnum text-ink-4">· confidence {Math.round(i.confidence * 100)}%</span>
+                              <span className="tnum text-ink-4">· {Math.round(i.confidence * 100)}% sure</span>
                             </span>
                           </button>
                         ))}

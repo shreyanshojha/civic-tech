@@ -21,6 +21,9 @@ import { getIndex, getLegislators, type MemberSummary } from '../lib/data';
 import { useAsync, useDebounced } from '../lib/hooks';
 import { CENSUS_LOOKUP_NOTICE, lookupDistrict, type DistrictMatch, type GeocodeResult } from '../lib/geocode';
 import { CoverageNote, ShortDisclaimer, SourceLink } from '../components/Framing';
+import { ViewToggle } from '../components/ViewToggle';
+import { Term } from '../components/Glossary';
+import { useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, MemberAvatar, PartyTag, SectionTitle } from '../components/ui';
 
 type SortKey = 'name' | 'money' | 'state';
@@ -68,7 +71,7 @@ function MemberRow({ m, cycle }: { m: MemberSummary; cycle?: number }) {
             <>
               <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
                 <span className="tnum font-medium text-ink-1">{usd(m.donorSummary.totalItemized, { compact: true })}</span>
-                <span className="text-xs text-ink-4">disclosed{cycle ? `, cycle ${cycle}` : ''}</span>
+                <span className="text-xs text-ink-3">reported{cycle ? `, cycle ${cycle}` : ''}</span>
                 {fec && <SourceLink href={fec}>FEC filings</SourceLink>}
               </div>
 
@@ -87,15 +90,15 @@ function MemberRow({ m, cycle }: { m: MemberSummary; cycle?: number }) {
                   ))}
                   {m.donorSummary.unclassifiedShare > 0 && (
                     <span className="text-2xs text-ink-4">
-                      {(m.donorSummary.unclassifiedShare * 100).toFixed(0)}% of their money is not attributed to any sector
+                      {(m.donorSummary.unclassifiedShare * 100).toFixed(0)}% of their money could not be matched to an industry
                     </span>
                   )}
                 </div>
               )}
             </>
           ) : (
-            <p className="mt-1.5 text-xs text-ink-4">
-              No campaign-finance record is linked to this member in the current bundle.{' '}
+            <p className="mt-1.5 text-xs text-ink-3">
+              No campaign money is linked to this member in this data. That is a gap in the data.{' '}
               <SourceLink href={m.sourceUrl}>congress.gov record</SourceLink>
             </p>
           )}
@@ -134,8 +137,8 @@ function AddressResult({
         <CoverageNote>
           {match.stateName} is represented in the House by a non-voting delegate
           {match.state === 'PR' ? ' (a resident commissioner)' : ''}, and has no senators. The seat
-          below can introduce and cosponsor legislation and vote in committee, but not on final
-          passage on the House floor.
+          below can introduce bills, sign on as a <Term k="cosponsor">cosponsor</Term>, and vote in
+          committee — but cannot vote on final passage on the House floor.
         </CoverageNote>
       )}
 
@@ -144,8 +147,8 @@ function AddressResult({
         {house.length === 0 ? (
           <Empty>
             No sitting member is recorded for {match.state}
-            {match.atLarge ? ' at-large' : `-${match.districtCode.replace(/^0+/, '')}`} in this data
-            bundle. The seat may be vacant, or the bundle may predate a special election.
+            {match.atLarge ? ' at-large' : `-${match.districtCode.replace(/^0+/, '')}`} in this data.
+            The seat may be empty, or this data may be older than a special election.
           </Empty>
         ) : (
           <ul className="divide-y divide-line border-y border-line">
@@ -158,7 +161,7 @@ function AddressResult({
         <div>
           <div className="label mb-2">Your senators</div>
           {senators.length === 0 ? (
-            <Empty>No senators are recorded for {match.stateName} in this data bundle.</Empty>
+            <Empty>No senators are recorded for {match.stateName} in this data.</Empty>
           ) : (
             <ul className="divide-y divide-line border-y border-line">
               {senators.map((m) => <MemberRow key={m.bioguideId} m={m} cycle={cycle} />)}
@@ -174,6 +177,7 @@ export default function Reps() {
   const { data: legislators, error, loading } = useAsync(getLegislators, []);
   const { data: index } = useAsync(getIndex, []);
   const [params, setParams] = useSearchParams();
+  const { isQuick } = useViewMode();
 
   const [q, setQ] = useState(params.get('q') ?? '');
   const debouncedQ = useDebounced(q, 150);
@@ -258,17 +262,17 @@ export default function Reps() {
   return (
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">Representatives</h1>
-      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-3">
-        Every sitting member of the House and Senate, with the disclosed money behind them. Search by
-        name, filter by state, or look up the district an address falls in. Open anyone to see their
-        full donor breakdown and the bills where their donors’ sectors and their legislative activity
-        touch.
+      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">
+        Everyone in the House and Senate right now, with the money reported behind them. Search a
+        name, pick a state, or type an address to find your district. Open anyone to see who funded
+        them and what they worked on.
       </p>
-      <ShortDisclaimer className="mt-2" />
+      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      <ViewToggle className="mt-3" />
 
       {/* ---- address lookup ---------------------------------------------- */}
       <section className="card mt-5 p-4">
-        <h2 className="text-md font-semibold text-ink-0">Find the district an address is in</h2>
+        <h2 className="text-md font-semibold text-ink-0">Find out who represents an address</h2>
 
         {/* The notice is above the input, always rendered, never dismissable. */}
         <div className="caveat mt-2 px-3 py-2.5">
@@ -312,9 +316,9 @@ export default function Reps() {
           </div>
         </form>
 
-        <p className="mt-2 text-xs leading-relaxed text-ink-3">
-          United States street addresses only. The federal geocoder is free and unmetered, and can
-          take several seconds to answer.
+        <p className="mt-2 text-xs leading-relaxed text-ink-2">
+          US street addresses only. The government service is free, and can take a few seconds to
+          answer.
         </p>
 
         {lookingUp && <Loading what="the district for that address" />}
@@ -381,18 +385,19 @@ export default function Reps() {
         </SectionTitle>
 
         {sort === 'money' && (
-          <p className="mb-3 text-xs leading-relaxed text-ink-4">
-            Sorted by total itemized money disclosed to the FEC for cycle {cycle ?? '—'}. A larger
-            total mostly reflects the size and competitiveness of a race, not anything about the
-            member. Members with no linked FEC record sort last.
+          <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
+            Sorted by the total reported to the FEC for cycle {cycle ?? '—'}. A big total usually
+            means a big, close race — not anything about the member. Members with no FEC record are
+            last.
           </p>
         )}
 
         {loading ? (
-          <Loading what="members of Congress" />
+          <Loading what="the list of members" />
         ) : filtered.length === 0 ? (
           <Empty>
-            No member matches that. Try a surname, clear the state filter, or look up an address above.
+            No member matches that. Try a last name on its own, clear the state filter, or type an
+            address in the box above.
           </Empty>
         ) : (
           <>

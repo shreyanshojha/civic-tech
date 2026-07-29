@@ -24,10 +24,15 @@ import { useState } from 'react';
 import {
   DISCLAIMER_LONG,
   DISCLAIMER_MEDIUM,
+  DISCLAIMER_PLAIN,
+  DISCLAIMER_PLAIN_MORE,
   DISCLAIMER_SHORT,
   OVERLAP_BAND_LABEL,
   OVERLAP_BAND_NOTE,
+  OVERLAP_BAND_PLAIN,
+  OVERLAP_BAND_PLAIN_NOTE,
   SCORE_EXPLAINER,
+  SCORE_EXPLAINER_PLAIN,
   overlapBand,
 } from '@ftm/core';
 
@@ -45,38 +50,90 @@ import {
  *    text is unchanged and nothing is truncated.
  */
 export function PersistentDisclaimer() {
+  const [open, setOpen] = useState(false);
   return (
     <div
       role="note"
       aria-label="How to read this site"
+      data-persistent-disclaimer=""
       className="sticky bottom-0 z-40 border-t-2 border-accent bg-paper-raised print-disclaimer"
     >
       <div className="mx-auto flex max-h-[40vh] max-w-content items-start gap-2.5 overflow-y-auto px-4 py-2.5">
-        <span aria-hidden className="mt-px shrink-0 select-none text-accent" title="">
+        <span aria-hidden className="mt-0.5 shrink-0 select-none text-accent" title="">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
             <circle cx="8" cy="8" r="6.5" />
             <path d="M8 7.2v4M8 4.8v.8" strokeLinecap="round" />
           </svg>
         </span>
-        <p className="text-xs leading-snug text-ink-3">
-          <strong className="font-semibold text-ink-1">Correlation, not causation.</strong>{' '}
-          This site places two public records side by side — disclosed campaign contributions, and
-          legislative activity. An overlap is a pattern worth a question. It is not evidence that
-          money influenced a vote, and not an accusation of wrongdoing.{' '}
-          <a className="link whitespace-nowrap font-medium text-ink-2" href="#/methodology">
-            How the numbers work →
-          </a>
-        </p>
+        <div className="min-w-0">
+          {/* The default line is the plain one, and it is a step LARGER than the
+              text it replaced. A caveat nobody finishes protects nobody. */}
+          <p className="text-sm leading-snug text-ink-1">
+            <strong className="font-semibold">{DISCLAIMER_PLAIN}</strong>{' '}
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              className="tap-24 whitespace-nowrap font-medium text-accent underline decoration-accent-line underline-offset-2"
+            >
+              {open ? 'Show less' : 'Why?'}
+            </button>
+          </p>
+          {open && (
+            <div className="mt-1.5 space-y-1.5 text-xs leading-snug text-ink-3">
+              <p>{DISCLAIMER_PLAIN_MORE}</p>
+              {/* The fuller wording is not replaced by the plain line, only
+                  folded behind it. This is the same sentence every other
+                  surface of this project shows. */}
+              <p className="max-w-measure-wide">{DISCLAIMER_MEDIUM}</p>
+              <p>
+                <a className="link font-medium text-ink-2" href="#/methodology">How the numbers work →</a>{' '}
+                <a className="link ml-2 font-medium text-ink-2" href="#/limitations">What this misses →</a>
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-/** Medium-weight framing, for the top of any page that shows a computed score. */
-export function InlineDisclaimer({ className = '' }: { className?: string }) {
+/**
+ * Medium-weight framing, for the top of any page that shows a computed score.
+ *
+ * `plain` leads with the short sentence and folds the fuller one behind a tap.
+ * Both are always on the page; the difference is only which one a skimmer
+ * reads. A caveat that gets skipped because it is four lines long is a caveat
+ * that did not happen.
+ */
+export function InlineDisclaimer({ className = '', plain = false }: { className?: string; plain?: boolean }) {
+  const [open, setOpen] = useState(false);
+  if (!plain) {
+    return (
+      <div className={`caveat px-3 py-2.5 ${className}`}>
+        <p>{DISCLAIMER_MEDIUM}</p>
+      </div>
+    );
+  }
   return (
     <div className={`caveat px-3 py-2.5 ${className}`}>
-      <p>{DISCLAIMER_MEDIUM}</p>
+      <p>
+        <strong className="font-semibold">{DISCLAIMER_PLAIN}</strong>{' '}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="tap-24 whitespace-nowrap font-medium underline underline-offset-2"
+        >
+          {open ? 'Show less' : 'Why?'}
+        </button>
+      </p>
+      {open && (
+        <>
+          <p className="mt-1.5">{DISCLAIMER_PLAIN_MORE}</p>
+          <p className="mt-1.5">{DISCLAIMER_MEDIUM}</p>
+        </>
+      )}
     </div>
   );
 }
@@ -87,10 +144,10 @@ export function InlineDisclaimer({ className = '' }: { className?: string }) {
  * line on the page. It is now --ink-3 with an accent rule marking it as framing
  * rather than as body copy.
  */
-export function ShortDisclaimer({ className = '' }: { className?: string }) {
+export function ShortDisclaimer({ className = '', plain = false }: { className?: string; plain?: boolean }) {
   return (
-    <p className={`border-l-2 border-accent-line pl-2.5 text-xs leading-snug text-ink-3 ${className}`}>
-      {DISCLAIMER_SHORT}
+    <p className={`border-l-2 border-accent-line pl-2.5 text-sm leading-snug text-ink-2 ${className}`}>
+      {plain ? DISCLAIMER_PLAIN : DISCLAIMER_SHORT}
     </p>
   );
 }
@@ -105,8 +162,24 @@ export function LongDisclaimer() {
   );
 }
 
-export function ScoreExplainer({ open: initial = false }: { open?: boolean }) {
+/**
+ * How to read the number.
+ *
+ * Two levels, and the plain one is the default. `plain` swaps the three long
+ * sentences for the three short ones from disclaimer.ts and keeps the long ones
+ * one tap further in — folded, never dropped. Both sets say the same three
+ * things: what it is, what it is not, what to do with it.
+ */
+export function ScoreExplainer({
+  open: initial = false,
+  plain = false,
+}: {
+  open?: boolean;
+  plain?: boolean;
+}) {
   const [open, setOpen] = useState(initial);
+  const [long, setLong] = useState(false);
+  const copy = plain && !long ? SCORE_EXPLAINER_PLAIN : SCORE_EXPLAINER;
   return (
     <div className="mt-2">
       <button
@@ -124,20 +197,32 @@ export function ScoreExplainer({ open: initial = false }: { open?: boolean }) {
         {open ? 'Hide' : 'What does this number mean?'}
       </button>
       {open && (
-        <dl className="mt-2 space-y-2 rounded border border-line border-l-2 border-l-accent-line bg-paper p-3 text-sm leading-relaxed text-ink-2">
-          <div>
-            <dt className="label">What it is</dt>
-            <dd>{SCORE_EXPLAINER.what}</dd>
-          </div>
-          <div>
-            <dt className="label">What it is not</dt>
-            <dd>{SCORE_EXPLAINER.whatItIsNot}</dd>
-          </div>
-          <div>
-            <dt className="label">How to use it</dt>
-            <dd>{SCORE_EXPLAINER.howToUse}</dd>
-          </div>
-        </dl>
+        <div className="mt-2 rounded border border-line border-l-2 border-l-accent-line bg-paper p-3">
+          <dl className="space-y-2 text-sm leading-relaxed text-ink-2">
+            <div>
+              <dt className="label">What it is</dt>
+              <dd>{copy.what}</dd>
+            </div>
+            <div>
+              <dt className="label">What it is not</dt>
+              <dd>{copy.whatItIsNot}</dd>
+            </div>
+            <div>
+              <dt className="label">How to use it</dt>
+              <dd>{copy.howToUse}</dd>
+            </div>
+          </dl>
+          {plain && (
+            <button
+              type="button"
+              onClick={() => setLong((l) => !l)}
+              aria-expanded={long}
+              className="tap-24 mt-2 text-xs font-medium text-ink-3 underline decoration-ink-5 underline-offset-2 hover:text-accent"
+            >
+              {long ? 'Show the short version' : 'Show the longer version'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -154,21 +239,28 @@ export function OverlapScore({
   score,
   size = 'md',
   showExplainer = true,
+  plain = false,
 }: {
   score: number;
   size?: 'sm' | 'md' | 'lg';
   showExplainer?: boolean;
+  /** Quick view: the plain band name and the plain one-line note, same bands. */
+  plain?: boolean;
 }) {
   const band = overlapBand(score);
   const pct = Math.round(score * 100);
   const rampClass = { minimal: 'ramp-0', some: 'ramp-1', substantial: 'ramp-2', high: 'ramp-3' }[band];
   const numberSize = { sm: 'text-lg', md: 'text-xl', lg: 'text-2xl' }[size];
+  // Plain view changes the words, never the bands and never the number. The
+  // formal label still travels with the score in the accessible name below.
+  const bandLabel = plain ? OVERLAP_BAND_PLAIN[band] : OVERLAP_BAND_LABEL[band];
+  const bandNote = plain ? OVERLAP_BAND_PLAIN_NOTE[band] : OVERLAP_BAND_NOTE[band];
 
   return (
     <div>
-      <div className="flex items-baseline gap-2">
+      <div className="flex flex-wrap items-baseline gap-x-2">
         <span className={`${numberSize} tnum font-semibold text-ink-0`}>{pct}%</span>
-        <span className="text-sm text-ink-3">{OVERLAP_BAND_LABEL[band]}</span>
+        <span className="text-sm font-medium text-ink-2">{bandLabel}</span>
       </div>
       {/* The track is a plain 0–100% axis with hairline ticks at the band
           boundaries (15 / 35 / 60). The ticks are what let a reader judge
@@ -178,6 +270,7 @@ export function OverlapScore({
         className="relative mt-1.5 h-2 w-full overflow-hidden rounded-sm bg-ink-7"
         role="img"
         aria-label={`Overlap ${pct} percent. ${OVERLAP_BAND_LABEL[band]}.`}
+        title={OVERLAP_BAND_LABEL[band]}
       >
         <div className={`h-full rounded-sm ${rampClass}`} style={{ width: `${Math.max(2, pct)}%` }} />
         {[15, 35, 60].map((t) => (
@@ -189,8 +282,8 @@ export function OverlapScore({
           />
         ))}
       </div>
-      <p className="mt-1.5 text-xs leading-snug text-ink-3">{OVERLAP_BAND_NOTE[band]}</p>
-      {showExplainer && <ScoreExplainer />}
+      <p className="mt-1.5 text-xs leading-snug text-ink-3">{bandNote}</p>
+      {showExplainer && <ScoreExplainer plain={plain} />}
     </div>
   );
 }

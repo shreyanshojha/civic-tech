@@ -407,9 +407,25 @@ export async function ingestCongress(): Promise<void> {
   const congress = CONFIG.congress();
   const maxBills = CONFIG.maxBills();
   const maxVotes = Number(process.env.FTM_MAX_VOTES ?? 15);
+  /**
+   * Having a key does not mean the API is the right source for everything.
+   *
+   * Bill detail costs ~5 API calls per bill (detail + summaries + committees +
+   * cosponsors + subjects), so a 1,500-bill dataset is ~7,500 calls against a
+   * 1,000/hour quota — seven hours, to re-fetch data GovInfo already serves in
+   * bulk for free and unmetered. Votes, by contrast, are ONLY available through
+   * the API and cost one call each.
+   *
+   * So the default with a key is: bulk for bills, API for votes. Set
+   * FTM_BILLS_SOURCE=api to override when you want the freshest bill text and
+   * have the quota to spend.
+   */
+  const billsSource = (process.env.FTM_BILLS_SOURCE ?? 'bulk').toLowerCase();
   const mode = key ? 'api' : 'bulk';
 
-  console.log(`\nCongress ingestion — ${congress}th Congress, up to ${maxBills} bills, mode=${mode}`);
+  console.log(`\nCongress ingestion — ${congress}th Congress, up to ${maxBills} bills`);
+  console.log(`  bills: ${mode === 'api' && billsSource === 'api' ? 'Congress.gov API' : 'GovInfo bulk data (free, unmetered)'}`);
+  console.log(`  votes: ${mode === 'api' ? 'Congress.gov API' : 'unavailable without a key'}`);
   if (mode === 'bulk') {
     console.log('  No CONGRESS_API_KEY set — using GovInfo bulk data and the public-domain');
     console.log('  congress-legislators datasets. This needs no signup. Roll-call vote');
@@ -425,7 +441,7 @@ export async function ingestCongress(): Promise<void> {
   console.log(`  ${roster} committee seats`);
 
   let bills = 0;
-  if (mode === 'api') {
+  if (mode === 'api' && billsSource === 'api') {
     try {
       bills = await ingestBillsApi(key!, congress, maxBills);
     } catch (err) {

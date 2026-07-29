@@ -31,13 +31,15 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { INDUSTRY_BY_ID, isIndustryId, shortDate, usd } from '@ftm/core';
 import type { IndustryId } from '@ftm/core';
 import { getAwards, getBills, getLegislators, getOverlaps } from '../lib/data';
 import type { BillSummary, MemberSummary } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { CoverageNote, InlineDisclaimer, OverlapScore, ShortDisclaimer, SourceLink } from '../components/Framing';
+import { Fold, ViewToggle } from '../components/ViewToggle';
+import { parseView, useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, MemberAvatar, MethodTag, SectionTitle, Stat } from '../components/ui';
 
 const NON_INDUSTRY: IndustryId[] = ['party-leadership', 'super-pac-unattributed', 'government'];
@@ -78,9 +80,14 @@ export default function IndustryDetail() {
   const awards = useAsync(getAwards, []);
   const overlaps = useAsync(getOverlaps, []);
 
-  const [billLimit, setBillLimit] = useState(20);
-  const [memberLimit, setMemberLimit] = useState(15);
-  const [awardLimit, setAwardLimit] = useState(10);
+  const { isQuick } = useViewMode();
+  // Quick view opens with a handful of rows. The "show more" buttons below are
+  // unchanged, and the full list is one tap away either way.
+  const [searchParams] = useSearchParams();
+  const startQuick = parseView(searchParams.get('view')) === 'quick';
+  const [billLimit, setBillLimit] = useState(startQuick ? 5 : 20);
+  const [memberLimit, setMemberLimit] = useState(startQuick ? 5 : 15);
+  const [awardLimit, setAwardLimit] = useState(startQuick ? 5 : 10);
 
   const sectorId = valid ? (id as IndustryId) : null;
 
@@ -148,7 +155,8 @@ export default function IndustryDetail() {
       <header className="mt-2">
         <h1 className="serif text-2xl leading-snug text-ink-0">{meta?.label ?? sectorId}</h1>
         <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">{meta?.blurb}</p>
-        <ShortDisclaimer className="mt-2" />
+        <ShortDisclaimer className="mt-2" plain={isQuick} />
+        <ViewToggle className="mt-3" />
       </header>
 
       {isBucket && (
@@ -168,14 +176,14 @@ export default function IndustryDetail() {
         <Stat
           label="Disclosed to members"
           value={disclosedFloor > 0 ? `≥ ${usd(disclosedFloor, { compact: true })}` : '—'}
-          sub="A floor — counts only members for whom this was a top-three donor sector"
+          sub="At least this much. It counts only members this was a top-three funder for."
         />
-        <Stat label="Members" value={recipients.length} sub="With this among their three largest donor sectors" />
-        <Stat label="Bills tagged" value={taggedBills.length} sub="Tags produced by this tool, not by Congress" />
+        <Stat label="Members" value={recipients.length} sub="People this is one of the three biggest funders for." />
+        <Stat label="Bills tagged" value={taggedBills.length} sub="Tagged by this tool, not by Congress." />
         <Stat
           label="Federal awards"
           value={awardTotal > 0 ? usd(awardTotal, { compact: true }) : '—'}
-          sub={`${sectorAwards.length} award${sectorAwards.length === 1 ? '' : 's'} in this bundle — context, not evidence`}
+          sub={`${sectorAwards.length} award${sectorAwards.length === 1 ? '' : 's'} here. Background, not evidence.`}
         />
       </div>
 
@@ -186,14 +194,14 @@ export default function IndustryDetail() {
             <SectionTitle note={`${taggedBills.length} bill${taggedBills.length === 1 ? '' : 's'}`}>
               Bills this sector is tagged on
             </SectionTitle>
-            <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-3">
-              Ordered by the classifier's own confidence that the bill affects this sector, highest
-              first. That number is the classifier's self-assessment, not a measured probability, and
-              a confident tag can still be wrong. Open any bill to see the rationale it recorded.
+            <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
+              Most confident tag first. That percentage is this tool marking its own work, not a
+              measured chance — a confident tag can still be wrong. Open a bill to see why it was
+              tagged.
             </p>
 
             {bills.loading ? (
-              <Loading what="bills" />
+              <Loading what="the bills tagged with this sector" />
             ) : taggedBills.length === 0 ? (
               <Empty>
                 No bill in this bundle carries this sector tag. That is a real answer for narrow
@@ -213,12 +221,12 @@ export default function IndustryDetail() {
                         </Link>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-4">
-                        <span className="tnum">classifier confidence {Math.round(confidence * 100)}%</span>
+                        <span className="tnum">{Math.round(confidence * 100)}% sure of this tag</span>
                         {b.latestActionDate && <span>Last action {shortDate(b.latestActionDate)}</span>}
                         {b.policyArea && <span>· {b.policyArea}</span>}
                         {b.overlapCount > 0 && (
                           <span>
-                            {b.overlapCount} member{b.overlapCount === 1 ? '' : 's'} with overlapping donor sectors
+                            {b.overlapCount} member{b.overlapCount === 1 ? '' : 's'} whose donors are in these industries
                           </span>
                         )}
                         <MethodTag method={b.classificationMethod} />
@@ -244,11 +252,17 @@ export default function IndustryDetail() {
           {/* ---- members ------------------------------------------------ */}
           <section>
             <SectionTitle note={`${recipients.length} member${recipients.length === 1 ? '' : 's'}`}>
-              Members who received the most disclosed money from this sector
+              Members who got the most money from this sector
             </SectionTitle>
 
             <div className="mb-3 space-y-2">
-              <InlineDisclaimer />
+              <InlineDisclaimer plain={isQuick} />
+              <CoverageNote>
+                <strong className="font-semibold">This is a list of receipts. It is not a ranking
+                of who is influenced.</strong>{' '}
+                Being high on it means one thing: a bigger reported dollar figure.
+              </CoverageNote>
+              <Fold open={!isQuick} title="Why this list is easy to misread">
               <CoverageNote>
                 <strong className="font-semibold">This list is a receipts list, not a ranking of
                 anything else.</strong>{' '}
@@ -259,14 +273,15 @@ export default function IndustryDetail() {
                 reason — the sector is there. Read a name here as a starting point for a question,
                 and check the member's own page, where the full untruncated breakdown lives.
               </CoverageNote>
+              </Fold>
             </div>
 
             {legislators.loading ? (
-              <Loading what="members" />
+              <Loading what="the members this sector funded" />
             ) : recipients.length === 0 ? (
               <Empty>
-                No sitting member in this bundle has this sector among their three largest disclosed
-                donor sectors. That does not mean the sector gave nothing — see the caveat below.
+                No sitting member here has this sector among their three biggest funders. That does
+                not mean the sector gave nothing — see the note above.
               </Empty>
             ) : (
               <>
@@ -282,7 +297,7 @@ export default function IndustryDetail() {
                           {m.chamber === 'Senate' ? 'Sen.' : 'Rep.'} · {m.state}
                           {m.district ? `-${m.district}` : ''}
                           {' · '}
-                          {usd(m.donorSummary?.totalItemized ?? 0, { compact: true })} disclosed in total
+                          {usd(m.donorSummary?.totalItemized ?? 0, { compact: true })} reported in total
                         </div>
                         {/* One hue. Length is the only encoding. */}
                         <div className="mt-1.5 h-1 w-full rounded-full bg-ink-7">
@@ -347,7 +362,7 @@ export default function IndustryDetail() {
                       {b.title.length > 90 ? `${b.title.slice(0, 90)}…` : b.title}
                     </Link>
                     <div className="mt-3">
-                      <OverlapScore score={o.score} size="sm" showExplainer={false} />
+                      <OverlapScore score={o.score} size="sm" showExplainer={false} plain={isQuick} />
                     </div>
                   </li>
                 ))}

@@ -87,7 +87,9 @@ export function IndustryBars({
   linkTo?: boolean;
 }) {
   const top = max ?? Math.max(...rows.map((r) => r.amount), 1);
-  if (rows.length === 0) return <p className="text-sm text-ink-4">No sector-attributable money in this cycle.</p>;
+  if (rows.length === 0) {
+    return <p className="text-sm text-ink-3">None of this money could be matched to an industry.</p>;
+  }
   return (
     <ul className="space-y-1.5">
       {rows.map((r) => {
@@ -167,8 +169,14 @@ export function Loading({ what = 'data', rows = 4 }: { what?: string; rows?: num
   const widths = ['72%', '54%', '84%', '61%', '77%', '48%'];
   return (
     <div className="py-6" role="status" aria-live="polite">
-      <span className="sr-only">Loading {what}…</span>
-      <p aria-hidden className="text-xs text-ink-4">Loading {what}…</p>
+      {/* Say what is coming, in words a reader can act on. "Loading…" tells
+          them nothing; "Reading the file for this bill" tells them what will be
+          on the screen and that it is a file, not a server they are waiting on. */}
+      <span className="sr-only">Getting {what}. One moment.</span>
+      <p aria-hidden className="text-sm text-ink-2">Getting {what}…</p>
+      <p aria-hidden className="mt-0.5 text-xs text-ink-3">
+        This site reads files on your device. Nothing is being sent anywhere.
+      </p>
       <div aria-hidden className="mt-3 space-y-3.5">
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="space-y-1.5">
@@ -184,16 +192,18 @@ export function Loading({ what = 'data', rows = 4 }: { what?: string; rows?: num
 export function ErrorState({ error }: { error: Error }) {
   return (
     <div className="card mx-auto my-10 max-w-2xl border-l-2 border-l-caveat p-5">
-      <h2 className="text-md font-semibold text-ink-0">Nothing to show yet</h2>
-      <p className="mt-2 text-sm text-ink-3">
-        This is a local, static site. If the data folder is empty, generate it once and reload —
-        nothing is fetched from a server at runtime.
+      <h2 className="text-md font-semibold text-ink-0">There is no data here yet</h2>
+      <p className="mt-2 text-sm text-ink-2">
+        This site runs from files on your own machine. It looks like those files have not been
+        built yet. Build them once, reload, and this page will work. Nothing is fetched from a
+        server while you use the site.
       </p>
       <pre className="mt-3 overflow-x-auto rounded border border-line bg-ink-7 p-2.5 font-mono text-xs leading-relaxed text-ink-2">
         {error.message}
       </pre>
-      <p className="mt-3 text-xs text-ink-4">
-        Run <span className="mono text-ink-3">npm run pipeline</span> from the repository root.
+      <p className="mt-3 text-xs text-ink-3">
+        Run <span className="mono text-ink-2">npm run pipeline</span> from the repository root. The
+        first run needs no keys.
       </p>
     </div>
   );

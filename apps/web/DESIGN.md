@@ -228,6 +228,80 @@ product and cannot.
 
 ---
 
+## 5b. Layering: short by default, depth on demand
+
+The site is written twice. Not two different claims — one claim at two reading
+levels, with the short one on top.
+
+**The rule: fold, never delete.** Every number, table, caveat and coverage note
+that exists in full detail view is reachable from quick view in at most one tap.
+If a change makes a page shorter by removing a qualification, it is not a
+simplification, it is a different claim. Fold it instead.
+
+### The view mode
+
+`?view=quick | full` in the query string, **defaulting to quick**. It lives in
+the URL and nowhere else: `scripts/audit-repo.mjs` fails the build if anything
+writes a visitor's preference into browser storage or a cookie (its
+`client-storage` rule names the exact APIs), and a preference in the URL is also
+shareable and survives the back button. See `src/lib/view.ts`.
+
+`<ViewToggle/>` sits in the same place on every page that has one — directly
+under the page title. `<Fold>` is the block-level partner: a native `<details>`
+whose default open state follows the view mode, so "Everything" behaves like one
+control instead of twelve. A reader can still open or close any single fold.
+
+Quick view may:
+
+- use the plain band names (`OVERLAP_BAND_PLAIN`) and the plain score explainer
+  (`SCORE_EXPLAINER_PLAIN`) instead of the formal ones,
+- use `plainAmount()` / `plainShare()` phrasing next to (never instead of) the
+  exact figure,
+- show the top 3–5 rows of a list with a control that opens the rest,
+- collapse methodology and derivation prose into folds.
+
+Quick view may **not** drop a coverage caveat, a provenance link, or the band
+label on a score. The percentage itself never changes between views, and the
+formal band label always travels in the accessible name of the score bar.
+
+### The persistent disclaimer
+
+Default text is now `DISCLAIMER_PLAIN` at `text-sm` — a step **larger** than the
+`text-xs` it replaced — with `DISCLAIMER_PLAIN_MORE` and the unchanged
+`DISCLAIMER_MEDIUM` behind a "Why?" button. This is the one place where making
+the framing shorter makes it stronger: the long version was correct and unread.
+
+Everything in §5 still holds. It is still sticky, opaque, undismissable, on
+every route, and every string still comes from `@ftm/core/disclaimer.ts`.
+
+### Plain language
+
+Target roughly 6th–8th grade in body copy: short sentences, active voice, no
+term of art without a gloss. Terms of art get `<Term k="…"/>` from
+`components/Glossary.tsx`, which opens a definition inline on tap — not a
+`title=` tooltip, which does not exist on a phone. Definitions live in
+`lib/glossary.ts`.
+
+Measured on the visible text of a page in quick view, prose sentences only
+(headings, chips and table cells excluded):
+
+| page | Flesch-Kincaid before | after | avg sentence before | after |
+|---|---|---|---|---|
+| home | 11.0 | 7.5 | 16.6 words | 12.1 words |
+| bill detail | 10.9 | 5.4 | 18.5 words | 11.0 words |
+
+### The money-flow diagram
+
+`components/MoneyFlow.tsx`. Two connectors, drawn differently on purpose: a
+solid ribbon (thickness = amount) for sector → member, which is a disclosed
+payment, and a thin dashed line labelled "worked on" for member → bill, which is
+a role and carries no money. One unbroken flow would read as "this money bought
+this bill" — the exact claim the project refuses to make. Everything in the
+picture is repeated in the labelled list under it and in its `aria-label`; the
+graphic is never the only channel.
+
+---
+
 ## 6. Motion and focus
 
 `prefers-reduced-motion: reduce` is honoured with a **blanket guard** in

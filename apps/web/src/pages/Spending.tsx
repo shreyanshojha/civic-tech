@@ -28,6 +28,8 @@ import type { IndustryId } from '@ftm/core';
 import { getAwards, getIndex } from '../lib/data';
 import { useAsync, useDebounced } from '../lib/hooks';
 import { CoverageNote, ShortDisclaimer, SourceLink } from '../components/Framing';
+import { Fold, ViewToggle } from '../components/ViewToggle';
+import { useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, MethodTag, SectionTitle, Stat } from '../components/ui';
 
 type SortKey = 'amount-desc' | 'amount-asc' | 'date-desc' | 'date-asc' | 'recipient';
@@ -38,6 +40,7 @@ export default function Spending() {
   const { data: awards, error, loading } = useAsync(getAwards, []);
   const index = useAsync(getIndex, []);
   const [params, setParams] = useSearchParams();
+  const { isQuick } = useViewMode();
 
   // GlobalSearch navigates here with ?q=<recipient name>.
   const [q, setQ] = useState(params.get('q') ?? '');
@@ -125,14 +128,22 @@ export default function Spending() {
   return (
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">Federal spending</h1>
-      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-3">
-        Contracts and grants recorded on USASpending.gov, the government's own record of where federal
-        money went. Every row links to the award's page on usaspending.gov so any figure here can be
-        checked against the primary record in one click.
+      <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">
+        Contracts and grants, from the government's own record of where federal money went. Every row
+        links to that record, so you can check any figure in one click.
       </p>
-      <ShortDisclaimer className="mt-2" />
+      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      <ViewToggle className="mt-3" />
 
       <div className="mt-4">
+        <CoverageNote>
+          <strong className="font-semibold">This is background. It is never evidence.</strong> Nothing
+          on this page can show that a donation caused an award, and none of it should be read that
+          way.
+        </CoverageNote>
+      </div>
+
+      <Fold className="mt-3" open={!isQuick} title="Why awards are here at all, and what they cannot show">
         <CoverageNote>
           <strong className="font-semibold">This is context. It is never evidence.</strong> A federal
           award is the outcome of a procurement or grant process that runs for years, is constrained
@@ -142,13 +153,13 @@ export default function Spending() {
           read that way. Awards are here so that a reader looking at a bill about a sector can also
           see where federal money in that sector actually goes.
         </CoverageNote>
-      </div>
+      </Fold>
 
       {/* ---- headline figures ------------------------------------------- */}
       <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-4">
-        <Stat label="Awards shown" value={filtered.length.toLocaleString()} sub={`of ${bundleAwards.toLocaleString()} in this bundle`} />
-        <Stat label="Value of those awards" value={usd(filteredTotal, { compact: true })} sub="Sum of the filtered rows" />
-        <Stat label="Awarding agencies" value={agencies.length} sub="Departments and independent agencies" />
+        <Stat label="Awards shown" value={filtered.length.toLocaleString()} sub={`out of ${bundleAwards.toLocaleString()} awards here`} />
+        <Stat label="What they are worth" value={usd(filteredTotal, { compact: true })} sub="The rows you are looking at, added up." />
+        <Stat label="Agencies" value={agencies.length} sub="The government bodies that handed the money out." />
         <Stat label="Sectors represented" value={sectors.length} sub={<Link className="link" to="/industries">Browse sectors →</Link>} />
       </div>
 
@@ -159,7 +170,7 @@ export default function Spending() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Recipient, agency, state code, or what the award was for…"
+            placeholder="A company, an agency, a state code, or what the money was for…"
             aria-label="Search federal awards"
             className="h-9 min-w-[15rem] flex-1 control px-3 text-sm"
           />
@@ -220,11 +231,11 @@ export default function Spending() {
         </SectionTitle>
 
         {loading ? (
-          <Loading what="federal awards" />
+          <Loading what="the list of federal awards" />
         ) : filtered.length === 0 ? (
           <Empty>
-            No award matches those filters.{' '}
-            {hasFilters ? 'Try clearing the sector or agency filter, or shortening the search text.' : ''}
+            No award matches that.{' '}
+            {hasFilters ? 'Try clearing the sector or agency box, or typing less in the search box.' : ''}
           </Empty>
         ) : (
           <>

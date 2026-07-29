@@ -138,3 +138,78 @@ export const PROJECT_REPO_URL_WARNING =
 
 export const PROJECT_NAME = 'Follow the Money';
 export const PROJECT_TAGLINE = 'Public money records and public legislative records, side by side.';
+
+// ---------------------------------------------------------------------------
+// PLAIN-LANGUAGE LAYER
+//
+// Most people skim. That is not a failing on their part — it is how reading
+// works when you are not being paid to do it. A caveat written at
+// postgraduate reading level and buried in a paragraph protects nobody,
+// because nobody finishes the paragraph.
+//
+// So the framing exists at two levels, and the SHORT one is the default:
+//   - plain, ~6th-grade reading level, one short sentence, always visible
+//   - the fuller versions above, one tap away for anyone who wants them
+//
+// This is layering, not dilution. Every plain string below must be as TRUE as
+// its longer counterpart — shorter, never softer. If you cannot say it plainly
+// without losing the caveat, the caveat stays and the sentence gets longer.
+// ---------------------------------------------------------------------------
+
+/** The default banner text. Short words, short sentences, no jargon. */
+export const DISCLAIMER_PLAIN =
+  'This shows money and lawmaking side by side. It does not prove one caused the other.';
+
+/** The follow-on line, shown when someone taps to expand. */
+export const DISCLAIMER_PLAIN_MORE =
+  'Donors often give to politicians who already agree with them. And a member from a farming area will work on farm bills. That is normal, not proof of anything.';
+
+/** Plain-language band names. Same bands, fewer syllables. */
+export const OVERLAP_BAND_PLAIN: Record<OverlapBand, string> = {
+  minimal: 'Barely any match',
+  some: 'A small match',
+  substantial: 'A fair match',
+  high: 'A big match',
+};
+
+/** One short sentence explaining a band, for readers who want no more. */
+export const OVERLAP_BAND_PLAIN_NOTE: Record<OverlapBand, string> = {
+  minimal: 'Almost none of this member\'s donor money comes from industries this bill touches.',
+  some: 'A little of this member\'s donor money comes from industries this bill touches.',
+  substantial: 'A fair chunk of this member\'s donor money comes from industries this bill touches. Common for members on related committees.',
+  high: 'Most of this member\'s donor money comes from industries this bill touches. Worth a look — but often just means they specialise in this area.',
+};
+
+/** The three-line version of the score explainer, for the quick view. */
+export const SCORE_EXPLAINER_PLAIN = {
+  what: 'Of all the money this member got, how much came from industries this bill would affect.',
+  whatItIsNot: 'It does not say how they voted, or whether the money changed anything.',
+  howToUse: 'Treat a big number as a reason to read more — not as an answer.',
+} as const;
+
+/**
+ * Puts a dollar figure on a human scale.
+ *
+ * "$274,100" is a number people's eyes slide off. Anchoring it to something
+ * concrete — a share of the total, a rank — is what makes it mean anything.
+ * Deliberately NOT dramatised: no "enough to buy X", which editorialises.
+ */
+export function plainAmount(amount: number): string {
+  if (!Number.isFinite(amount) || amount <= 0) return 'nothing recorded';
+  if (amount >= 1_000_000_000) return `$${(amount / 1_000_000_000).toFixed(1)} billion`;
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)} million`;
+  if (amount >= 1_000) return `$${Math.round(amount / 1000)} thousand`;
+  return `$${Math.round(amount)}`;
+}
+
+/** "about 1 in 3" — a fraction people can picture. */
+export function plainShare(share: number): string {
+  if (!Number.isFinite(share) || share <= 0) return 'none of it';
+  if (share >= 0.95) return 'almost all of it';
+  if (share >= 0.66) return 'about two thirds of it';
+  if (share >= 0.45) return 'about half of it';
+  if (share >= 0.28) return 'about a third of it';
+  if (share >= 0.18) return 'about a fifth of it';
+  if (share >= 0.08) return 'about a tenth of it';
+  return 'a small part of it';
+}

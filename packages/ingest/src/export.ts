@@ -585,7 +585,19 @@ export async function exportBundle(): Promise<void> {
     `Of $${Math.round(contribStats.total).toLocaleString()} in disclosed contributions this cycle, $${Math.round(attributable).toLocaleString()} resolves to a current member of Congress. The remainder went to challengers, retiring members and candidates for seats nobody in this dataset holds, and is not attributed to anyone here.`,
     `Campaign finance covers FEC cycle ${cycle} and includes only money disclosed to the FEC. It does not include dark money, 501(c)(4) spending, lobbying expenditure, bundling, or anything below the itemization threshold.`,
     `$${Math.round(contribStats.superpac).toLocaleString()} of the money shown came from independent-expenditure committees whose own donors are disclosed in a separate filing this pipeline does not traverse. It is labelled "funding source not visible" rather than assigned to an industry.`,
-    `$${Math.round(contribStats.unresolved).toLocaleString()} (${((contribStats.unresolved / Math.max(1, contribStats.total)) * 100).toFixed(1)}%) could not be attributed to any sector and is excluded from every overlap score.`,
+    (() => {
+      const split = db().prepare(`
+        SELECT COALESCE(SUM(CASE WHEN industry_method = 'placeholder' THEN amount END), 0) AS no_employer,
+               COALESCE(SUM(CASE WHEN industry = 'other' AND industry_method != 'placeholder' THEN amount END), 0) AS unresolved
+        FROM contributions WHERE cycle = ?`).get(cycle) as { no_employer: number; unresolved: number };
+      const pct = (n: number) => `${((n / Math.max(1, contribStats.total)) * 100).toFixed(1)}%`;
+      return (
+        `Money with no sector attached splits two ways, and the difference matters. ` +
+        `$${Math.round(split.no_employer).toLocaleString()} (${pct(split.no_employer)}) comes from filings that list no employer at all — "retired", "self-employed", "not employed" — so there is nothing for anyone to classify. ` +
+        `A further $${Math.round(split.unresolved).toLocaleString()} (${pct(split.unresolved)}) names an employer this tool could not place, which is a genuine coverage gap. ` +
+        `Both are excluded from every overlap score.`
+      );
+    })(),
     (() => {
       const covered = db().prepare(`
         SELECT COUNT(DISTINCT fc.bioguide_id) AS n FROM contributions c
@@ -595,7 +607,11 @@ export async function exportBundle(): Promise<void> {
       if (covered.n === 0) {
         return `Individual-donor detail is NOT in this bundle — it requires a free OpenFEC API key. Only committee (PAC) money is present, which is roughly half the disclosed picture.`;
       }
-      return `Individual-donor detail is present for only ${covered.n} of ${donorProfiles.size} members with donor data. For every other member the figures are committee (PAC) money alone, so totals are NOT comparable between members. Raise FTM_MAX_MEMBERS and re-run with an OpenFEC key for even coverage.`;
+      const ratio = covered.n / Math.max(1, donorProfiles.size);
+      if (ratio >= 0.95) {
+        return `Individual-donor detail covers ${covered.n} of ${donorProfiles.size} members. The ${donorProfiles.size - covered.n} without it show committee (PAC) money only, so their totals will look smaller than they are.`;
+      }
+      return `Individual-donor detail covers only ${covered.n} of ${donorProfiles.size} members with donor data. For the rest, the figures are committee (PAC) money alone, so totals are NOT comparable between members. Raise FTM_MAX_MEMBERS and re-run with an OpenFEC key for even coverage.`;
     })(),
     getMeta('classify_method')?.startsWith('llm')
       ? `Bills were classified by ${getMeta('classify_method')}.`

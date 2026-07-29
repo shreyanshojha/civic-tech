@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { classifyTextToIndustry, industryFromNaics } from './industries.js';
 import { computeOverlap } from './overlap.js';
 import {
+  DISCLAIMER_PLAIN,
+  DISCLAIMER_PLAIN_MORE,
+  OVERLAP_BAND_PLAIN,
+  SCORE_EXPLAINER_PLAIN,
+  plainAmount,
+  plainShare,
   DISCLAIMER_CARD,
   DISCLAIMER_LONG,
   DISCLAIMER_MEDIUM,
@@ -184,5 +190,43 @@ describe('stem matching regressions', () => {
 
   it('does not match a surname that merely starts like a bank', () => {
     expect(classifyTextToIndustry('BANCROFT FAMILY TRUST').industry).not.toBe('finance-banking');
+  });
+});
+
+describe('plain-language layer', () => {
+  it('is shorter than the formal version but keeps the causal caveat', () => {
+    expect(DISCLAIMER_PLAIN.length).toBeLessThan(DISCLAIMER_MEDIUM.length);
+    // Shorter, never softer: the non-causal claim must survive simplification.
+    expect(DISCLAIMER_PLAIN.toLowerCase()).toMatch(/does not prove|not proof|does not mean/);
+  });
+
+  it('reads at a low grade level — short sentences, short words', () => {
+    for (const text of [DISCLAIMER_PLAIN, DISCLAIMER_PLAIN_MORE]) {
+      const sentences = text.split(/[.!?]+/).filter((s) => s.trim());
+      const words = text.split(/\s+/).filter(Boolean);
+      expect(words.length / sentences.length).toBeLessThan(16); // avg sentence length
+      expect(words.filter((w) => w.length > 12).length).toBe(0); // no long words
+    }
+  });
+
+  it('never accuses anyone, even in the short form', () => {
+    for (const text of [DISCLAIMER_PLAIN, DISCLAIMER_PLAIN_MORE, ...Object.values(OVERLAP_BAND_PLAIN), ...Object.values(SCORE_EXPLAINER_PLAIN)]) {
+      expect(text.toLowerCase()).not.toMatch(/\b(corrupt|bribe|bought|paid off|crooked)\b/);
+    }
+  });
+
+  it('puts money on a human scale without editorialising', () => {
+    expect(plainAmount(0)).toBe('nothing recorded');
+    expect(plainAmount(950)).toBe('$950');
+    expect(plainAmount(274_100)).toBe('$274 thousand');
+    expect(plainAmount(3_400_000)).toBe('$3.4 million');
+    expect(plainAmount(2_100_000_000)).toBe('$2.1 billion');
+  });
+
+  it('describes shares as fractions people can picture', () => {
+    expect(plainShare(0)).toBe('none of it');
+    expect(plainShare(0.34)).toBe('about a third of it');
+    expect(plainShare(0.5)).toBe('about half of it');
+    expect(plainShare(0.99)).toBe('almost all of it');
   });
 });
