@@ -267,6 +267,61 @@ a { color: inherit; }
   .btn:hover { border-color: var(--accent); color: var(--accent); }
   .btn:disabled { opacity: 0.5; }
 
+  /* ---- the two caveat tiers ----------------------------------------------
+     A usability study produced the opposite of the intended effect. Every
+     qualification on this site was styled identically — an amber `.caveat`
+     box — repeated up to three times per screen, and the *boilerplate* was
+     the loudest of them while the limits that actually changed a number were
+     the quietest. Readers habituated, skimmed all of it, and missed the one
+     caveat that mattered. A low-trust reader went further and read the sheer
+     volume of amber as motive: "nobody puts a disclaimer that big on the
+     front door unless a lawyer made 'em."
+
+     So qualifications are now split into two kinds, which look different
+     because they ARE different:
+
+       .data-limit    a fact about THIS number. "18% of this member's money
+                      could not be matched to an industry." It sits inline,
+                      directly under the figure it qualifies, at the same type
+                      size as the copy around that figure, and is never folded
+                      away. It keeps the amber INK, because principle 1 of
+                      DESIGN.md reserves amber for exactly this meaning — a
+                      gap or a limit in the data — but it is a rule and a
+                      colour rather than a filled box, so five of them on a
+                      page do not read as five alarms.
+
+       .framing-note  the correlation-not-causation framing. Exactly ONE per
+                      screen, and never the sentence the persistent banner is
+                      already showing. Deliberately NOT amber: it is not a gap
+                      in the data, it is how to read the whole page, and
+                      giving it the data-gap colour is a large part of why
+                      amber stopped meaning anything.
+
+     `.caveat` below is unchanged and still means the third thing: this whole
+     dataset has a gap you need to know about before you read any of it. That
+     is a page-level statement, not a note on one figure. */
+  .data-limit {
+    border-left: 2px solid var(--caveat-line);
+    padding-left: 0.55rem;
+    color: var(--caveat);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    max-width: 82ch;
+  }
+  .data-limit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+  .framing-note {
+    border-left: 2px solid var(--accent-line);
+    background: var(--accent-soft);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.8rem;
+    font-size: var(--fs-sm);
+    line-height: 1.55;
+    color: var(--ink-2);
+  }
+  .framing-note > p { max-width: 82ch; }
+  .framing-note a { color: inherit; }
+
   /* Coverage caveats. The left rule is load-bearing: it survives a background
      being washed out in high-contrast mode or in print, where the amber fill
      does not, so the caveat cannot quietly stop looking like a caveat. */
@@ -493,6 +548,10 @@ a { color: inherit; }
     border: 1px solid #000 !important;
   }
   .caveat { border-left-width: 3px !important; }
+  /* Same reasoning as `.caveat`: the rule survives a printer that drops the
+     fill, so a limit on a figure cannot silently stop looking like one. */
+  .data-limit,
+  .framing-note { border-left-width: 3px !important; }
 }
 
 

@@ -136,6 +136,50 @@ interface BillRow {
   official_summary: string | null; congress_dot_gov_url: string; source_url: string; fetched_at: string;
 }
 
+interface DonorRow { name: string; industry: string; amount: number; kind: string; sourceUrl: string }
+
+/**
+ * Collapses filing artefacts out of the donor table.
+ *
+ * The OpenFEC by-employer endpoint returns the *employer string a donor typed*,
+ * so the raw list contains rows like `NULL`, `NONE`, `RETIRED`, `SELF EMPLOYED`
+ * and `NOT EMPLOYED` — with real dollar totals beside them. Rendered in a
+ * column headed DONOR, `NULL — $4,500,000` reads as concealment, and a reviewer
+ * reading this site as a hostile outsider said exactly that.
+ *
+ * They are not donors and not concealment: they are thousands of individuals
+ * whose filing lists no employer. So they collapse into one clearly-labelled,
+ * non-clickable row, and the aggregate is preserved rather than hidden.
+ */
+const PLACEHOLDER_EMPLOYER = /^(null|none|n\/?a|self|self.?employed|selfemployed|retired|not employed|unemployed|homemaker|requested|information requested|refused|\.|-)$/i;
+
+function collapsePlaceholderDonors(rows: DonorRow[]): (DonorRow & { isAggregate?: boolean })[] {
+  const real: DonorRow[] = [];
+  let placeholderTotal = 0;
+  let placeholderCount = 0;
+  for (const r of rows) {
+    if (PLACEHOLDER_EMPLOYER.test(String(r.name ?? '').trim())) {
+      placeholderTotal += r.amount;
+      placeholderCount++;
+    } else {
+      real.push(r);
+    }
+  }
+  const out: (DonorRow & { isAggregate?: boolean })[] = real.slice(0, 40);
+  if (placeholderTotal > 0) {
+    out.push({
+      name: `No employer listed on the filing (${placeholderCount} filing categories combined)`,
+      industry: 'other',
+      amount: placeholderTotal,
+      kind: 'individual',
+      sourceUrl: '',
+      isAggregate: true,
+    });
+    out.sort((a, b) => b.amount - a.amount);
+  }
+  return out;
+}
+
 const parse = <T>(s: string | null | undefined, fb: T): T => {
   if (!s) return fb;
   try { return JSON.parse(s) as T; } catch { return fb; }
@@ -193,7 +237,7 @@ export async function exportBundle(): Promise<void> {
   // --- legislators ---------------------------------------------------------
   const legRows = db().prepare(`
     SELECT bioguide_id, name, first_name, last_name, chamber, state, district, party,
-           image_url, official_url, fec_candidate_ids, terms, source, source_url, fetched_at
+           image_url, official_url, fec_candidate_ids, terms, district_places, source, source_url, fetched_at
     FROM legislators ORDER BY last_name, first_name
   `).all() as any[];
 
@@ -220,6 +264,9 @@ export async function exportBundle(): Promise<void> {
     imageUrl: l.image_url ?? undefined,
     officialUrl: l.official_url ?? undefined,
     fecCandidateIds: parse<string[]>(l.fec_candidate_ids, []),
+    // Towns this member keeps a district office in. The only human-readable
+    // geography available for a district without shipping map data.
+    districtPlaces: parse<string[]>(l.district_places, []),
     source: l.source,
     sourceUrl: l.source_url,
     fetchedAt: l.fetched_at,
@@ -309,6 +356,22 @@ export async function exportBundle(): Promise<void> {
     return true;
   });
   const awardDuplicatesDropped = awardRows.length - dedupedAwardRows.length;
+  /**
+   * Awards that must never be attributed to a congressional district.
+   *
+   * USASpending records a recipient's HQ district, not where the money is
+   * spent. For a state agency that means an entire state's Medicaid entitlement
+   * lands in whichever district holds the agency's mailing address.
+   */
+  const isStatewidePassThrough = (a: any): boolean => {
+    const name = String(a.recipient_name ?? '').toUpperCase();
+    const type = String(a.award_type ?? '').toUpperCase();
+    if (/BLOCK GRANT|ENTITLEMENT|FORMULA GRANT/.test(type)) return true;
+    if (/\b(STATE OF|COMMONWEALTH OF|DEPARTMENT OF|DEPT OF)\b/.test(name) && /GRANT/.test(type)) return true;
+    if (/\bCALIFORNIA DEPARTMENT|STATE CONTROLLER|STATE TREASURER\b/.test(name)) return true;
+    return false;
+  };
+
   const awards = dedupedAwardRows.map((a) => ({
     id: a.id, recipientName: a.recipient_name, recipientParentName: a.recipient_parent_name ?? undefined,
     awardType: a.award_type, amount: a.amount, actionDate: a.action_date,
@@ -319,6 +382,19 @@ export async function exportBundle(): Promise<void> {
     industry: a.industry, industryMethod: a.industry_method, description: a.description ?? undefined,
     source: a.source, sourceUrl: a.source_url, fetchedAt: a.fetched_at,
   }));
+
+  /**
+   * The subset of awards it is defensible to show under a member's name:
+   * inside the current Congress's window, not in the future, and not a
+   * statewide pass-through geocoded to an agency's mailing address.
+   */
+  const AWARD_WINDOW_START = `${CONFIG.cycle() - 6}-01-01`;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const districtEligibleAwards = awards.filter((a) => {
+    const d = String(a.actionDate ?? '');
+    if (!d || d < AWARD_WINDOW_START || d > todayIso) return false;
+    return !isStatewidePassThrough({ recipient_name: a.recipientName, award_type: a.awardType });
+  });
 
   // --- overlaps ------------------------------------------------------------
   const overlaps: OverlapResult[] = [];
@@ -519,15 +595,15 @@ export async function exportBundle(): Promise<void> {
       member: l,
       donorProfile: profile,
       topDonors: profile
-        ? db().prepare(`
+        ? collapsePlaceholderDonors(db().prepare(`
             SELECT c.contributor_name AS name, c.industry AS industry, SUM(c.amount) AS amount,
                    c.contributor_kind AS kind, c.source_url AS sourceUrl
             FROM contributions c
             JOIN fec_candidates fc ON fc.candidate_id = c.recipient_candidate_id
             WHERE fc.bioguide_id = ? AND c.cycle = ?
             GROUP BY c.contributor_name, c.industry
-            ORDER BY amount DESC LIMIT 40
-          `).all(l.bioguideId, cycle)
+            ORDER BY amount DESC LIMIT 60
+          `).all(l.bioguideId, cycle) as DonorRow[])
         : [],
       overlaps: memberOverlaps.map((o) => {
         const row = billRowById.get(o.billId);
@@ -552,9 +628,15 @@ export async function exportBundle(): Promise<void> {
         })
         .filter(Boolean)
         .slice(0, 40),
+      // Awards are filtered before they reach a member's page. Two errors were
+      // shipping here: awards dated 1997 and 2028 shown as money spent in a
+      // district under a member elected in 2014, and statewide Medicaid
+      // entitlement transfers geocoded to a state agency's headquarters, which
+      // produced "Federal money spent in CA-7 — $527.9 billion" (roughly
+      // $694,000 per resident, and more than California's entire state budget).
       districtAwards: l.district
-        ? awards.filter((a) => a.recipientState === l.state && String(a.recipientCongressionalDistrict ?? '') === String(l.district).padStart(2, '0')).slice(0, 25)
-        : awards.filter((a) => a.recipientState === l.state).slice(0, 25),
+        ? districtEligibleAwards.filter((a) => a.recipientState === l.state && String(a.recipientCongressionalDistrict ?? '') === String(l.district).padStart(2, '0')).slice(0, 25)
+        : districtEligibleAwards.filter((a) => a.recipientState === l.state).slice(0, 25),
       disclaimer: DISCLAIMER_MEDIUM,
     });
   }
@@ -661,6 +743,80 @@ export async function exportBundle(): Promise<void> {
 
   // --- coverage notes ------------------------------------------------------
   const attributable = [...donorProfiles.values()].reduce((sum, p) => sum + p.totalItemized, 0);
+
+  /**
+   * PLAUSIBILITY GUARD.
+   *
+   * A single member's reported receipts once reached $81.9M in this pipeline —
+   * 2.8x the next-highest figure — because party-committee money had been
+   * attributed to their personal campaign. It shipped, under their photograph,
+   * labelled "exact figure". Nothing caught it, because nothing was looking.
+   *
+   * So now something looks. A member whose total is a wild outlier is far more
+   * likely to be an attribution bug than a record-breaking fundraiser, and a
+   * false dollar figure attached to a named person is the single worst thing
+   * this project can output. Loud warning, and a hard failure when it is
+   * egregious.
+   */
+  {
+    const totals = [...donorProfiles.values()].map((p) => p.totalItemized).sort((a, b) => a - b);
+    if (totals.length > 20) {
+      const p99 = totals[Math.floor(totals.length * 0.99)]!;
+      const ceiling = p99 * 3;
+
+      /**
+       * Size alone is not the test — the CAUSE is.
+       *
+       * A genuine record-breaking fundraiser is an outlier and perfectly real;
+       * one member in this dataset raised $29M through their own principal
+       * campaign committee, almost all of it small-dollar. Failing the build on
+       * that would be punishing the data for being true.
+       *
+       * What is never legitimate is an outlier whose money arrives through a
+       * committee that is not the member's own principal campaign committee.
+       * That is the party/joint-fundraising misattribution bug. So: warn on any
+       * outlier, but only refuse to publish when a non-principal committee is
+       * feeding it.
+       */
+      const badCommittee = db().prepare(`
+        SELECT DISTINCT fc.bioguide_id AS bio, cm.name AS cmte, cm.designation AS dsgn, cm.committee_type AS type
+        FROM contributions c
+        JOIN fec_candidates fc ON fc.candidate_id = c.recipient_candidate_id
+        JOIN fec_committees cm ON cm.committee_id = c.recipient_committee_id
+        WHERE fc.bioguide_id IS NOT NULL
+          AND c.contributor_kind = 'individual'
+          AND (cm.designation != 'P' OR cm.committee_type IN ('X','Y','Z'))
+      `).all() as { bio: string; cmte: string; dsgn: string; type: string }[];
+      const badByMember = new Map(badCommittee.map((b) => [b.bio, b]));
+
+      let fatal = 0;
+      for (const [bio, p] of donorProfiles) {
+        if (p.totalItemized <= ceiling) continue;
+        const who = legislators.find((l) => l.bioguideId === bio);
+        const bad = badByMember.get(bio);
+        if (bad) {
+          fatal++;
+          console.error(
+            `  MISATTRIBUTION: ${who?.name ?? bio} = $${Math.round(p.totalItemized).toLocaleString()} includes money from ` +
+              `"${bad.cmte}" (designation ${bad.dsgn}, type ${bad.type}), which is not their principal campaign committee.`,
+          );
+        } else {
+          console.warn(
+            `  Large total (checked, looks genuine): ${who?.name ?? bio} = $${Math.round(p.totalItemized).toLocaleString()}, ` +
+              `over 3x the 99th percentile ($${Math.round(p99).toLocaleString()}). All of it arrives through their own ` +
+              `principal campaign committee, so this is reported as-is.`,
+          );
+        }
+      }
+      if (fatal > 0 && process.env.FTM_ALLOW_OUTLIERS !== '1') {
+        throw new Error(
+          `Refusing to export: ${fatal} member total(s) include money from a committee that is not their own. ` +
+            `Publishing a wrong dollar figure under a named person's photograph is not recoverable. ` +
+            `Fix the committee linkage, or set FTM_ALLOW_OUTLIERS=1 if you have verified the figures.`,
+        );
+      }
+    }
+  }
 
   const contribStats = db().prepare(`
     SELECT COUNT(*) n, COALESCE(SUM(amount),0) total,

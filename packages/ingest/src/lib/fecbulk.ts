@@ -148,3 +148,10 @@ export const PARTY_LEADERSHIP_CMTE_TYPES = new Set(['H', 'S', 'P', 'X', 'Y', 'Z'
  * "funding source not visible from here" rather than "unclassified".
  */
 export const SUPER_PAC_CMTE_TYPES = new Set(['O', 'U', 'V', 'W', 'I']);
+
+/**
+ * Party committee types — national, state and nonfederal party committees.
+ * These are never a candidate's own campaign committee, and their receipts must
+ * never be attributed to a candidate as money given to that candidate.
+ */
+export const PARTY_COMMITTEE_TYPES = new Set(['X', 'Y', 'Z']);

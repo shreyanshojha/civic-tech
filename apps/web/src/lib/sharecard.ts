@@ -16,8 +16,10 @@
  *      the canvas by a long name or a long bill title.
  *   2. The wording comes from @ftm/core. Nothing here writes its own sentence.
  *   3. The headline states two disclosed facts next to each other and stops.
- *      "gave … of the … disclosed to …, a cosponsor of …". Never "bought",
- *      "influenced", "in exchange for". See buildHeadline().
+ *      "$X of the $Y disclosed to <member> — a cosponsor of <bill> — came from
+ *      donors this tool classifies as <sector>." Never "bought", "influenced",
+ *      "in exchange for", and never a sector as the subject of a verb of
+ *      giving. See buildHeadline().
  *   4. The score is drawn on the same single-hue ink ramp the app uses. No red,
  *      no green, no party colour. A high score is not a verdict.
  *   5. THE THREE QUALIFIERS TRAVEL WITH THE NUMBER. A user council read a real
@@ -29,9 +31,9 @@
  *            them is a sponsor, a cosponsor, or a member of a committee with
  *            jurisdiction, and saying which is both more accurate and less
  *            insinuating.
- *        (b) the DENOMINATOR. "gave $20K … 80%" invites the reader to work out
- *            a $25,000 total that is nowhere on the card. The total disclosed
- *            is now in the headline, so the share is checkable from the image.
+ *        (b) the DENOMINATOR. "$20K … 80%" invites the reader to work out a
+ *            $25,000 total that is nowhere on the card. The total disclosed is
+ *            now in the headline, so the share is checkable from the image.
  *        (c) the CLASSIFICATION METHOD. The percentage depends on a machine
  *            guess about what the bill affects. A card that shows the number at
  *            the same epistemic weight as the dollar figure — which is a hard
@@ -82,6 +84,73 @@ export interface ShareCardFinding {
   totalDisclosed?: number | null;
   /** How the bill's sector tags were derived — 'llm', 'keyword-fallback', … */
   classificationMethod?: string | null;
+  /** True when the measure is a tribute, memorial, naming or procedural item. */
+  isCeremonial?: boolean;
+  /** Confidence of the sector tag that drives the score, when there is only one. */
+  topIndustryConfidence?: number | null;
+}
+
+/**
+ * Whether a finding is strong enough to be turned into a redistributable image.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A GATE EXISTS AT ALL
+ *
+ * A review of this tool by a congressional chief of staff generated this card
+ * from a real page:
+ *
+ *   "Lawyers & Lobbyists gave $43.3K of the $2.9M disclosed to [Member],
+ *    a cosponsor of H.Res. 1252"
+ *   — a resolution memorialising law enforcement officers killed in the line
+ *     of duty. Overlap score: 1%.
+ *
+ * The resolution passed by voice vote with 123 cosponsors. The sector tag came
+ * from a keyword match. The score was 1%. And the tool offered a one-click
+ * button to publish it as an image.
+ *
+ * Everything on the site can be careful; the card is the part that leaves and
+ * travels without any of it. So the card is not offered at all when the finding
+ * underneath it is too weak to survive being seen alone. Refusing to make an
+ * image is always available and always safe; an image, once made, is not
+ * retractable.
+ * ---------------------------------------------------------------------------
+ */
+export const SHARE_MIN_SCORE = 0.1;
+export const SHARE_MIN_SINGLE_TAG_CONFIDENCE = 0.6;
+
+export interface ShareEligibility {
+  eligible: boolean;
+  /** Shown to the reader in place of the button. Plain language, no blame. */
+  reason: string | null;
+}
+
+export function shareEligibility(finding: ShareCardFinding): ShareEligibility {
+  if (finding.isCeremonial) {
+    return {
+      eligible: false,
+      reason:
+        'No image for this one. This is a tribute or procedural measure, and putting a donor figure next to it would imply a connection that is not there.',
+    };
+  }
+  if (!Number.isFinite(finding.score) || finding.score < SHARE_MIN_SCORE) {
+    return {
+      eligible: false,
+      reason:
+        `No image for this one. The overlap is under ${Math.round(SHARE_MIN_SCORE * 100)}%, which is too small to mean anything once the picture is separated from this page.`,
+    };
+  }
+  if (
+    finding.classificationMethod === 'keyword-fallback' &&
+    typeof finding.topIndustryConfidence === 'number' &&
+    finding.topIndustryConfidence < SHARE_MIN_SINGLE_TAG_CONFIDENCE
+  ) {
+    return {
+      eligible: false,
+      reason:
+        'No image for this one. The industry tag behind this number came from word matching rather than a reading of the bill, and it is not confident enough to travel on its own.',
+    };
+  }
+  return { eligible: true, reason: null };
 }
 
 /** Logical card size. Chosen to match the 1.91:1 box every social preview crops to. */
@@ -279,16 +348,32 @@ export function buildRoleClause(role?: string | null): string {
 
 /**
  * The headline. Disclosed facts, adjacent, with no verb joining them that a
- * reader could mistake for a claim about cause.
+ * reader could mistake for a claim about cause — and no verb that assigns the
+ * act of giving to something that cannot give.
  *
- * Allowed: "gave", "disclosed", "of the … disclosed to".
+ * ---------------------------------------------------------------------------
+ * WHY THE SUBJECT OF THIS SENTENCE CHANGED
+ *
+ * It used to read "Electric utilities gave $187.4K of the $452.0K disclosed to
+ * X". Grammatically the sector is the one doing the giving, and the sector did
+ * not give anything. What is in the data is (a) contributions from political
+ * action committees, which are real entities that really contributed, and (b)
+ * contributions from individuals, bucketed by whatever employer each of them
+ * typed on their own filing. Corporations may not contribute to federal
+ * candidates at all — so "Electric utilities gave" states, on a shareable
+ * image, that a felony occurred.
+ *
+ * The money is the subject now, and the sector is where this tool put the
+ * donors. Same two facts, same denominator, no invented actor.
+ * ---------------------------------------------------------------------------
+ *
  * Not allowed anywhere in this project: "bought", "paid for", "influenced",
  * "in exchange for", "in return for", "bankrolled". If you are tempted to add
  * one, the answer is no — see DISCLAIMER_LONG.
  *
- * The denominator is in the sentence, not implied by it: "gave $20K of the
- * $25.1K disclosed to X" is checkable from the image alone, whereas "gave $20K
- * … 80%" asks the reader to reverse-engineer a total they were never shown.
+ * The denominator is in the sentence, not implied by it: "$20K of the $25.1K
+ * disclosed to X" is checkable from the image alone, whereas "$20K … 80%" asks
+ * the reader to reverse-engineer a total they were never shown.
  */
 export function buildHeadline(finding: ShareCardFinding): string {
   const { topIndustryLabel, topIndustryAmount, memberName, billLabel, totalDisclosed } = finding;
@@ -299,9 +384,9 @@ export function buildHeadline(finding: ShareCardFinding): string {
     const amount = usd(topIndustryAmount, { compact: true });
     const denominator =
       typeof totalDisclosed === 'number' && totalDisclosed > 0
-        ? ` of the ${usd(totalDisclosed, { compact: true })} disclosed to`
-        : ' to';
-    return `${topIndustryLabel} gave ${amount}${denominator} ${member}, ${roleClause} ${billLabel}.`;
+        ? `${amount} of the ${usd(totalDisclosed, { compact: true })} disclosed to`
+        : `${amount} disclosed to`;
+    return `${denominator} ${member} — ${roleClause} ${billLabel} — came from donors this tool classifies as ${topIndustryLabel}.`;
   }
   return `${member} is ${roleClause} ${billLabel}.`;
 }

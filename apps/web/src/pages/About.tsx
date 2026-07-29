@@ -22,7 +22,7 @@ import { Link } from 'react-router-dom';
 import { PROJECT_NAME, PROJECT_REPO_URL, PROJECT_REPO_URL_IS_PLACEHOLDER, PROJECT_TAGLINE } from '@ftm/core';
 import { getIndex } from '../lib/data';
 import { useAsync } from '../lib/hooks';
-import { LongDisclaimer, ShortDisclaimer } from '../components/Framing';
+import { LongDisclaimer } from '../components/Framing';
 import { Empty, ErrorState, Loading, SectionTitle } from '../components/ui';
 
 export default function About() {
@@ -32,10 +32,92 @@ export default function About() {
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">About {PROJECT_NAME}</h1>
       <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">{PROJECT_TAGLINE}</p>
-      <ShortDisclaimer className="mt-2" />
+      {/* No framing note at the top of this page: the full statement is a
+          section of the page itself, further down, in its own words. Repeating
+          a shorter version of it above would be the third copy on one screen. */}
+
+      {/* ---- who made it ---------------------------------------------------
+          ---------------------------------------------------------------------
+          A reviewer who was otherwise ready to trust this site stopped here:
+          no human is named anywhere in it, the footer had a heading reading
+          "OPEN SOURCE" over a block containing no link, and there was nowhere
+          to report an error. Anonymity plus an unverifiable claim of openness
+          reads as evasion whatever the intent, and it is the cheapest possible
+          thing to fix.
+
+          It cannot be filled in from inside the code, because the code does
+          not know who is publishing this copy. So it is a visible, deliberately
+          unmissable TODO rather than a blank: a reader can see that the slot
+          exists and has not been filled, which is a true statement about this
+          build, instead of seeing nothing and concluding it was hidden.
+          --------------------------------------------------------------------- */}
+      <section className="mt-8">
+        <SectionTitle>Who is behind this, and who paid for it</SectionTitle>
+        {/* Amber, and legitimately so under principle 1 of styles.css: this is
+            a gap in what this build can tell the reader, which is the one thing
+            the colour is reserved for. It is not a warning about a person. */}
+        <div className="caveat max-w-measure-wide px-3 py-2.5">
+          <p>
+            <strong className="font-semibold">
+              TODO — whoever publishes this build must fill this section in before it goes public.
+            </strong>{' '}
+            Replace the three lines below with real values. A civic-data site that will not say who
+            made it and who funded it has not earned anybody's trust, and this placeholder is here so
+            that publishing without answering is a visible omission rather than a silent one.
+          </p>
+          <ul className="mt-2 space-y-1">
+            <li>
+              <strong className="font-semibold">Maintainer:</strong> not set — put a real name or a
+              named group here.
+            </li>
+            <li>
+              <strong className="font-semibold">Contact:</strong> not set — an address a reader can
+              actually reach, for corrections and questions.
+            </li>
+            <li>
+              <strong className="font-semibold">Funding:</strong> not set — state who pays for this
+              work, or state plainly that nobody does and it is unfunded personal work.
+            </li>
+          </ul>
+        </div>
+        <p className="mt-3 max-w-measure text-base leading-relaxed text-ink-2">
+          What can be said without knowing who published this copy: the project takes no money from
+          any political party, campaign, committee, candidate, industry group or advocacy
+          organisation, because it takes no money at all — there is nothing to buy and no account to
+          open. It runs on the reader's own machine with the reader's own keys.
+        </p>
+      </section>
+
+      {/* ---- corrections ----------------------------------------------------- */}
+      <section className="mt-10">
+        <SectionTitle>Something looks wrong on a page</SectionTitle>
+        <ol className="max-w-measure space-y-2.5 text-base leading-relaxed text-ink-2">
+          <li>
+            <strong className="font-semibold">1. Open the primary record.</strong> Every figure on
+            every page links to the government file it came from — the FEC filing, the Congress.gov
+            record, the USASpending award. Start there.
+          </li>
+          <li>
+            <strong className="font-semibold">2. If this site and that record disagree, this site
+            is wrong.</strong> That is a bug in the code here, not a dispute with the agency, and it
+            should be reported to whoever maintains this build using the contact above.
+          </li>
+          <li>
+            <strong className="font-semibold">3. If the record itself is wrong,</strong> the
+            correction belongs with the agency that published it. Nothing here can amend a federal
+            filing, and this project deliberately does not edit the source data it displays.
+          </li>
+          <li>
+            <strong className="font-semibold">4. If a sector looks misassigned,</strong> that is the
+            most likely kind of error on this site by a wide margin. Sector labels are inferred from
+            free text somebody typed on a form.{' '}
+            <Link className="link" to="/methodology">How that inference works</Link>.
+          </li>
+        </ol>
+      </section>
 
       {/* ---- what it is --------------------------------------------------- */}
-      <section className="mt-8">
+      <section className="mt-10">
         <SectionTitle>What this is</SectionTitle>
         <div className="max-w-measure space-y-3 text-base leading-relaxed text-ink-2">
           <p>
@@ -64,7 +146,7 @@ export default function About() {
         <SectionTitle>How it runs</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="card p-4">
-            <div className="label mb-1.5">On the reader's own machine</div>
+            <h3 className="label mb-1.5">On the reader's own machine</h3>
             <p className="text-sm leading-relaxed text-ink-3">
               The pipeline runs locally. It fetches from government sources into a local SQLite file,
               computes everything at build time, and writes a folder of plain JSON. What is on screen
@@ -74,7 +156,7 @@ export default function About() {
             </p>
           </div>
           <div className="card p-4">
-            <div className="label mb-1.5">With the reader's own keys</div>
+            <h3 className="label mb-1.5">With the reader's own keys</h3>
             <p className="text-sm leading-relaxed text-ink-3">
               A first run needs no API keys at all: three of the four sources publish bulk files or
               open endpoints with no signup, and the fourth is public-domain data. Keys are strictly
@@ -84,7 +166,7 @@ export default function About() {
             </p>
           </div>
           <div className="card p-4">
-            <div className="label mb-1.5">No account, no telemetry, no server</div>
+            <h3 className="label mb-1.5">No account, no telemetry, no server</h3>
             <p className="text-sm leading-relaxed text-ink-3">
               There is nothing to sign up for, because there is nothing to sign up to. No analytics,
               no error reporting, no usage tracking, no cookies for identity, nothing phoning home.
@@ -94,7 +176,7 @@ export default function About() {
             </p>
           </div>
           <div className="card p-4">
-            <div className="label mb-1.5">Portable on purpose</div>
+            <h3 className="label mb-1.5">Portable on purpose</h3>
             <p className="text-sm leading-relaxed text-ink-3">
               The build output is a folder of static files. It works opened straight off a disk with
               no server at all, and on any static host with no rewrite rules — which is why routing
@@ -165,12 +247,12 @@ export default function About() {
               unset, say so instead of rendering a dead link. */}
           {PROJECT_REPO_URL_IS_PLACEHOLDER ? (
             <p>
-              MIT licensed. This build has no public source URL set, so there is nothing to link to
-              here yet — the address lives in{' '}
-              <span className="mono">packages/core/src/disclaimer.ts</span> as{' '}
-              <span className="mono">PROJECT_REPO_URL</span> and whoever publishes this build has to
-              fill it in. Anybody with the source is free to run it, fork it, correct it, or take it
-              somewhere else entirely.
+              MIT licensed. <strong className="font-semibold">This is an unpublished build and it
+              has no public source link yet.</strong> Nothing is being withheld — an address simply
+              has not been set for this copy, and whoever publishes it has to set one. Until then
+              there is no repository to point at, and saying so is more useful than a heading that
+              promises source code and links nowhere. Anybody with the source is free to run it, fork
+              it, correct it, or take it somewhere else entirely.
             </p>
           ) : (
             <p>

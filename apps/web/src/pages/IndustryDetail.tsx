@@ -37,7 +37,7 @@ import type { IndustryId } from '@ftm/core';
 import { getAwards, getBills, getLegislators, getOverlaps } from '../lib/data';
 import type { BillSummary, MemberSummary } from '../lib/data';
 import { useAsync } from '../lib/hooks';
-import { CoverageNote, InlineDisclaimer, OverlapScore, ShortDisclaimer, SourceLink } from '../components/Framing';
+import { CoverageNote, DataLimit, FramingNote, OverlapScore, SourceLink } from '../components/Framing';
 import { Fold, ViewToggle } from '../components/ViewToggle';
 import { parseView, useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, MemberAvatar, MethodTag, SectionTitle, Stat } from '../components/ui';
@@ -155,7 +155,10 @@ export default function IndustryDetail() {
       <header className="mt-2">
         <h1 className="serif text-2xl leading-snug text-ink-0">{meta?.label ?? sectorId}</h1>
         <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">{meta?.blurb}</p>
-        <ShortDisclaimer className="mt-2" plain={isQuick} />
+        {/* The single framing block for this page. It used to appear twice —
+            here and again above the member list — printing the same sentence
+            the sticky banner shows, three copies on one screen. */}
+        <FramingNote className="mt-2 max-w-measure-wide" />
         <ViewToggle className="mt-3" />
       </header>
 
@@ -176,9 +179,9 @@ export default function IndustryDetail() {
         <Stat
           label="Disclosed to members"
           value={disclosedFloor > 0 ? `≥ ${usd(disclosedFloor, { compact: true })}` : '—'}
-          sub="At least this much. It counts only members this was a top-three funder for."
+          sub="Counts only members this was a top-three funder for."
         />
-        <Stat label="Members" value={recipients.length} sub="People this is one of the three biggest funders for." />
+        <Stat label="Members" value={recipients.length} sub="People this is one of their three biggest reported sources for." />
         <Stat label="Bills tagged" value={taggedBills.length} sub="Tagged by this tool, not by Congress." />
         <Stat
           label="Federal awards"
@@ -186,6 +189,17 @@ export default function IndustryDetail() {
           sub={`${sectorAwards.length} award${sectorAwards.length === 1 ? '' : 's'} here. Background, not evidence.`}
         />
       </div>
+      {/* The truncation that governs every figure in the row above, adjacent to
+          that row rather than a screen further down. It used to be stated three
+          separate times on this page — twice as amber boxes saying the same
+          thing and once as a grey footnote — and nowhere near the numbers. */}
+      <DataLimit className="mt-3">
+        <strong className="font-semibold">These are floors, not totals.</strong> The shared file this
+        page reads carries only each member's three largest donor sectors, so a member who took real
+        money from this sector, but for whom it ranked fourth or lower, is absent from every figure
+        here — not shown with a small number, absent. Any individual's complete breakdown is on their
+        own page.
+      </DataLimit>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-9">
@@ -252,36 +266,37 @@ export default function IndustryDetail() {
           {/* ---- members ------------------------------------------------ */}
           <section>
             <SectionTitle note={`${recipients.length} member${recipients.length === 1 ? '' : 's'}`}>
-              Members who got the most money from this sector
+              Members who received the most from donors in this sector
             </SectionTitle>
 
-            <div className="mb-3 space-y-2">
-              <InlineDisclaimer plain={isQuick} />
+            {/* One box, not three. The amber box and the folded amber box under
+                it opened with the same claim in almost the same words, and the
+                inline disclaimer above them repeated the sticky banner. */}
+            <div className="mb-3">
               <CoverageNote>
-                <strong className="font-semibold">This is a list of receipts. It is not a ranking
-                of who is influenced.</strong>{' '}
+                <strong className="font-semibold">
+                  This is a list of receipts. It is not a ranking of who is influenced.
+                </strong>{' '}
                 Being high on it means one thing: a bigger reported dollar figure.
+                <Fold className="mt-2" open={!isQuick} title="Why this list is easy to misread">
+                  <p className="max-w-measure-wide">
+                    It is not an ordering of who is beholden to this sector or captured by it, and it
+                    carries no implication of wrongdoing about anyone on it. Members whose districts
+                    contain a sector receive money from it and legislate on it for the same
+                    unremarkable reason — the sector is there. Read a name here as a starting point
+                    for a question, and check that member's own page, where the full untruncated
+                    breakdown lives.
+                  </p>
+                </Fold>
               </CoverageNote>
-              <Fold open={!isQuick} title="Why this list is easy to misread">
-              <CoverageNote>
-                <strong className="font-semibold">This list is a receipts list, not a ranking of
-                anything else.</strong>{' '}
-                Position on it means one thing: a larger disclosed dollar figure. It is not an
-                ordering of who is influenced by this sector, beholden to it, or captured by it, and
-                it carries no implication of wrongdoing about anyone on it. Members whose districts
-                contain a sector receive money from it and legislate on it for the same unremarkable
-                reason — the sector is there. Read a name here as a starting point for a question,
-                and check the member's own page, where the full untruncated breakdown lives.
-              </CoverageNote>
-              </Fold>
             </div>
 
             {legislators.loading ? (
               <Loading what="the members this sector funded" />
             ) : recipients.length === 0 ? (
               <Empty>
-                No sitting member here has this sector among their three biggest funders. That does
-                not mean the sector gave nothing — see the note above.
+                No sitting member here has this sector among their three biggest sources. That is not
+                the same as nothing having been reported from it — see the note above the figures.
               </Empty>
             ) : (
               <>
@@ -328,13 +343,6 @@ export default function IndustryDetail() {
               </>
             )}
 
-            <p className="mt-3 max-w-measure-wide text-xs leading-relaxed text-ink-4">
-              <strong className="font-semibold text-ink-3">What is missing from this list.</strong>{' '}
-              The shared file this page reads carries only each member's three largest donor sectors,
-              so members for whom this sector ranked fourth or lower are absent entirely rather than
-              listed with a small figure. The totals above are therefore a floor, and the ordering
-              favours sectors that concentrate their giving over sectors that spread it thin.
-            </p>
           </section>
 
           {/* ---- overlaps ----------------------------------------------- */}
@@ -434,7 +442,7 @@ export default function IndustryDetail() {
         {/* ---- sidebar ----------------------------------------------- */}
         <aside className="space-y-6">
           <div className="card p-4">
-            <div className="label mb-2">How this sector gets assigned</div>
+            <h3 className="label mb-2">How this sector gets assigned</h3>
             <p className="text-xs leading-relaxed text-ink-3">
               Contributions land in this bucket through one of four routes, tried in order: a curated
               organisation table checked into the repository, keyword stems matched against the
@@ -453,17 +461,16 @@ export default function IndustryDetail() {
           </div>
 
           <div className="card p-4">
-            <div className="label mb-2">Sector identifier</div>
+            <h3 className="label mb-2">Sector identifier</h3>
             <p className="mono text-xs text-ink-3">{sectorId}</p>
-            <p className="mt-2 text-xs leading-relaxed text-ink-4">
-              Defined in <span className="mono">packages/core/src/industries.ts</span>. The taxonomy is
-              intentionally coarse: self-reported employer text will not carry finer distinctions
-              reliably.
+            <p className="mt-2 text-sm leading-relaxed text-ink-3">
+              The taxonomy is fixed, checked into the project, and intentionally coarse:
+              self-reported employer text will not carry finer distinctions reliably.
             </p>
           </div>
 
           <div className="card p-4">
-            <div className="label mb-2">Other sectors</div>
+            <h3 className="label mb-2">Other sectors</h3>
             <div className="flex flex-wrap gap-1.5">
               {Object.values(INDUSTRY_BY_ID)
                 .filter((i) => i.id !== sectorId)

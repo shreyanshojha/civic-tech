@@ -27,7 +27,7 @@ import { INDUSTRY_BY_ID, shortDate, usd } from '@ftm/core';
 import type { IndustryId } from '@ftm/core';
 import { getAwards, getIndex } from '../lib/data';
 import { useAsync, useDebounced } from '../lib/hooks';
-import { CoverageNote, ShortDisclaimer, SourceLink } from '../components/Framing';
+import { CoverageNote, DataLimit, FramingNote, SourceLink } from '../components/Framing';
 import { Fold, ViewToggle } from '../components/ViewToggle';
 import { useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, MethodTag, SectionTitle, Stat } from '../components/ui';
@@ -132,28 +132,34 @@ export default function Spending() {
         Contracts and grants, from the government's own record of where federal money went. Every row
         links to that record, so you can check any figure in one click.
       </p>
-      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      <FramingNote className="mt-2 max-w-measure-wide" />
       <ViewToggle className="mt-3" />
 
+      {/* ---------------------------------------------------------------------
+          This used to be two amber boxes, one directly above the other, opening
+          with "This is background. It is never evidence." and "This is context.
+          It is never evidence." — the same sentence twice, the second one one
+          tap away. A reader who has read the first has no reason to open the
+          second, and a reader who has not read the first will not read either.
+          One box now, with the substance that used to be in the folded copy
+          folded under it rather than repeated. */}
       <div className="mt-4">
         <CoverageNote>
           <strong className="font-semibold">This is background. It is never evidence.</strong> Nothing
           on this page can show that a donation caused an award, and none of it should be read that
           way.
+          <Fold className="mt-2" open={!isQuick} title="Why awards are here at all">
+            <p className="max-w-measure-wide">
+              A federal award is the outcome of a procurement or grant process that runs for years,
+              is constrained by statute, is administered by career civil servants, and is usually
+              competed. No filter, sort order or total on this page is capable of showing that a
+              campaign contribution caused, influenced, or was exchanged for an award. Awards are
+              here so that a reader looking at a bill about a sector can also see where federal money
+              in that sector actually goes.
+            </p>
+          </Fold>
         </CoverageNote>
       </div>
-
-      <Fold className="mt-3" open={!isQuick} title="Why awards are here at all, and what they cannot show">
-        <CoverageNote>
-          <strong className="font-semibold">This is context. It is never evidence.</strong> A federal
-          award is the outcome of a procurement or grant process that runs for years, is constrained
-          by statute, is administered by career civil servants, and is usually competed. Nothing on
-          this page — no filter, no sort order, no total — is capable of showing that a campaign
-          contribution caused, influenced, or was exchanged for an award, and none of it should be
-          read that way. Awards are here so that a reader looking at a bill about a sector can also
-          see where federal money in that sector actually goes.
-        </CoverageNote>
-      </Fold>
 
       {/* ---- headline figures ------------------------------------------- */}
       <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-4">
@@ -162,6 +168,16 @@ export default function Spending() {
         <Stat label="Agencies" value={agencies.length} sub="The government bodies that handed the money out." />
         <Stat label="Sectors represented" value={sectors.length} sub={<Link className="link" to="/industries">Browse sectors →</Link>} />
       </div>
+      {/* The limit that changes how every figure above should be read, next to
+          those figures rather than at the foot of the page. */}
+      <DataLimit className="mt-3">
+        These totals are of what is loaded here, never of federal spending. The bundle keeps only the
+        largest awards by value
+        {Number.isFinite(smallestInBundle) && (
+          <> — the smallest one present is {usd(smallestInBundle, { compact: true })}</>
+        )}
+        , so small awards, which are the overwhelming majority by count, are absent entirely.
+      </DataLimit>
 
       {/* ---- controls ---------------------------------------------------- */}
       <div className="mt-6 space-y-3">
@@ -370,17 +386,14 @@ export default function Spending() {
       <section className="mt-10 border-t border-line pt-6">
         <SectionTitle>What is in this table, and what is not</SectionTitle>
         <ul className="max-w-measure space-y-2 text-sm leading-relaxed text-ink-2">
+          {/* The truncation is stated once, next to the totals it qualifies, at
+              the top of the page. This bullet gives the mechanism rather than
+              repeating the sentence. */}
           <li>
             · <strong className="font-semibold">This is not all federal spending.</strong> The export
             step keeps the largest awards by dollar value rather than the whole firehose, so the
-            bundle holds {bundleAwards.toLocaleString()} rows.
-            {Number.isFinite(smallestInBundle) && (
-              <> The smallest award present is {usd(smallestInBundle, { compact: true })}, which is
-              effectively the cut-off: nothing below it is here at all.</>
-            )}{' '}
-            Small awards — which are the overwhelming majority of awards by count — are absent
-            entirely. Any total on this page is a total of what is loaded here, not of federal
-            spending.
+            bundle holds {bundleAwards.toLocaleString()} rows. That cut is by value, not by sample,
+            so it is not a random subset of anything and no share computed from it generalises.
           </li>
           <li>
             · <strong className="font-semibold">The sector on each row is this tool's guess.</strong>{' '}

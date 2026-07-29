@@ -165,7 +165,24 @@ export function MemberAvatar({
  * no-preference` query, so a reader who asked for stillness gets a static grey
  * block rather than a pulsing one. `role="status"` keeps the announcement.
  */
-export function Loading({ what = 'data', rows = 4 }: { what?: string; rows?: number }) {
+/**
+ * The default second line, and why it is overridable.
+ *
+ * Every other load on this site really is a local file read, and saying so is
+ * the point. But the address lookup is the one flow that DOES send something —
+ * and it was showing "Nothing is being sent anywhere" while it sent an address
+ * to the Census Bureau, directly contradicting the notice sitting inches above
+ * it. A reader who catches a site contradicting itself about where their data
+ * goes stops believing the rest of the page, correctly.
+ *
+ * So the line is a prop. A caller whose flow is not a local read MUST pass its
+ * own; the default is only true for the ones that are.
+ */
+const LOCAL_READ_NOTE = 'This site reads files on your device. Nothing is being sent anywhere.';
+
+export function Loading({
+  what = 'data', rows = 4, note = LOCAL_READ_NOTE,
+}: { what?: string; rows?: number; note?: string }) {
   const widths = ['72%', '54%', '84%', '61%', '77%', '48%'];
   return (
     <div className="py-6" role="status" aria-live="polite">
@@ -174,9 +191,7 @@ export function Loading({ what = 'data', rows = 4 }: { what?: string; rows?: num
           on the screen and that it is a file, not a server they are waiting on. */}
       <span className="sr-only">Getting {what}. One moment.</span>
       <p aria-hidden className="text-sm text-ink-2">Getting {what}…</p>
-      <p aria-hidden className="mt-0.5 text-xs text-ink-3">
-        This site reads files on your device. Nothing is being sent anywhere.
-      </p>
+      <p aria-hidden className="mt-0.5 text-xs text-ink-3">{note}</p>
       <div aria-hidden className="mt-3 space-y-3.5">
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="space-y-1.5">

@@ -51,9 +51,89 @@ allowed to express a quantity.
 
 `--caveat` amber means exactly one thing: *this data has a gap or a limit you
 need to know about before you read the number.* It is never a severity, never a
-warning about a person, never "attention". `.caveat` and `<CoverageNote/>` are
-the only things that may use it. If a block is amber, a reader must be able to
-assume it is talking about the dataset, not about a legislator.
+warning about a person, never "attention". If a block is amber, a reader must be
+able to assume it is talking about the dataset, not about a legislator.
+
+### Qualifications come in three kinds and must look like three kinds
+
+This is the correction to the mistake that did the most damage in testing. Every
+qualification on the site used to be an amber `.caveat` box: the correlation
+boilerplate, the coverage gaps, and the one sentence that said how much of the
+number in front of the reader was missing. Same colour, same shape, same size,
+up to three per screen, and the boilerplate was the loudest of them.
+
+Two things followed. Readers habituated and skimmed all of it, so the caveat
+that changed a specific number was skipped along with the boilerplate they had
+already read six times. And a low-trust reader read the *volume* of amber as a
+motive — "nobody puts a disclaimer that big on the front door unless a lawyer
+made 'em" — and then read every gap the site was honest about as something being
+hidden. The hedging produced the opposite of its intent.
+
+So there are three tiers, and they are visually distinct:
+
+| tier | what it says | how it looks | how many |
+|---|---|---|---|
+| `.data-limit` | a fact about **this number** — "60% of this member's money has no industry attached"; "these are their three largest sectors only" | amber ink, 2px amber rule, **no fill**, inline, directly under the figure, at the size of the copy around it | as many as there are figures that need one |
+| `.caveat` / `<CoverageNote/>` | a gap in **the whole dataset** — no votes in this bundle, awards truncated to the largest few thousand | the amber box, unchanged | at most one per claim, never the same sentence twice |
+| `.framing-note` / `<FramingNote/>` | correlation-not-causation | **not amber** — accent rule on `--accent-soft` | exactly **one** per screen |
+
+Three rules follow from the table and are the ones worth enforcing:
+
+1. **A data limit is never folded and never shrunk.** It used to be `text-2xs`
+   in `--ink-4` — the smallest, faintest text on the site — carrying the most
+   decision-relevant sentence on the page. It is now at least `text-sm` and sits
+   next to the number rather than in a footnote.
+2. **Framing is not a data gap, so it is not amber.** Giving the boilerplate the
+   colour reserved for real gaps is most of why the colour stopped meaning
+   anything. `<FramingNote/>` carries `DISCLAIMER_MEDIUM` and nothing else.
+3. **A page never repeats the persistent banner's own sentence.** The banner
+   says `DISCLAIMER_PLAIN`; an on-page framing block therefore says the *fuller*
+   version, so a reader who reads both gets more rather than the same thing
+   twice. Measured before this pass: seven of eleven routes printed the banner's
+   sentence a second time, one printed it a third. Now zero do.
+
+Do not "improve" a page by adding a second framing block. If a section feels
+like it needs one, the caveat it actually needs is a `.data-limit` about the
+number in it.
+
+**A framing block is one per screen, not one per screenful.** `<FramingNote/>`
+usually sits under the page title; on `/reps` it sits above the members list
+instead. That is deliberate: 206 vertical pixels at 375px between the title and
+the first control put the address input at ~865px, under both the fold and the
+sticky disclaimer bar, on a 375×667 phone — the reader could not see the control
+she came for. It is still exactly one block, still the full `DISCLAIMER_MEDIUM`
+wording, still unfolded and unshrunk; it just sits next to the figures it frames
+rather than above two controls that produce none. Moving it is allowed. Folding
+it, shrinking it, or adding a second one is not.
+
+### A repeated caveat is one caveat, said once
+
+The same sentence printed on every row of a list is not N times the care. It is
+how a reader learns to skip the class of thing it belongs to, and — measured in
+testing — how a low-trust reader reads volume as motive.
+
+So: **a qualification that is identical across the rows of a list is stated once,
+above the list, and suppressed on the rows.** `<OverlapScore showBandNote={false}/>`
+is the sanctioned way to do that for a band note, and `bandNoteFor()` /
+`distinctBands()` in `Framing.tsx` build the single statement so the wording
+still comes from `@ftm/core`. It is only legal in a list, and only when the list
+carries the equivalent statement. The band **label** and the formal band in the
+bar's accessible name still travel with every individual score, so no single
+number is ever stripped of its meaning.
+
+Measured on a member page (`/reps/A000055`), counting `.data-limit`, `.caveat`,
+`.framing-note`, per-row band notes and unmarked prose qualifiers:
+
+| view | before | after |
+|---|---|---|
+| quick (default) | 12 | 8 |
+| full | 17 | 10 |
+
+No fact was removed to get there. The two amber notes about the two halves of
+the unattributed money were merged into one `.data-limit` attached to the figure
+they describe; the two notes under the donor table were merged into one; the
+"these are only the largest sectors" sentence stopped being printed twice; and
+the band note stopped being printed once per bill.
 
 ### The ink ramp is split into text and structure
 
@@ -214,6 +294,11 @@ You may restyle it. You may not:
   number without going through `<OverlapScore/>`,
 - soften or hide a coverage caveat.
 
+One thing you now *must* do that you previously did not: **render at most one
+on-page framing block per screen, and never the banner's own sentence.** The
+banner is the framing; a page that repeats it verbatim is not reinforcing it, it
+is teaching the reader to skip it. See §1.
+
 Two constraints it now satisfies that it did not before: it is **opaque** (it was
 95% translucent with a backdrop blur, so page text ghosted through it during
 scroll and the most important sentence on the site looked like a rendering bug),
@@ -317,7 +402,34 @@ paper-coloured spacer ring, so it stays visible on top of the `accent-soft` and
 at 375px and at 1440px, 0 without a visible ring.
 
 Heading order is verified per route: exactly one `h1`, no skipped levels, on all
-11 routes.
+11 routes. Card titles are real headings (`h3`/`h4` carrying `.label`), not
+styled `<div>`s, so "jump to the next heading" reaches them; the member and bill
+cards in an overlap list carry an `h3` of their own, which is also what keeps
+`<WhatThisMeans/>`'s `h4`s from jumping straight from `h2`.
+
+### Route changes are announced, and the skip link is a button
+
+Both of these were bugs, and the first one was severe.
+
+`<a href="#main">` under a `HashRouter` does not jump to an element. The whole
+route lives in `location.hash`, so activating it *replaced* the route with
+`#main`, which matches nothing — the router rendered "Page not found" and the
+page vanished. It was the first tab stop on every page, so the one control built
+specifically for keyboard users was the fastest way for a keyboard user to
+destroy the page they were reading. It is now a `<button>` that sets
+`tabindex="-1"` on `<main>` and focuses it, and touches the URL not at all.
+
+`<RouteAnnouncer/>` in `App.tsx` does three things on every navigation: sets
+`document.title` to the page's own `h1` (all eleven routes previously shared one
+title), moves focus to that `h1` with `tabindex="-1"`, and announces the same
+subject through a visually-hidden `role="status"`.
+
+It reads the `h1` through a `MutationObserver` rather than once, and ignores an
+`h1` that is the same node *and* the same text as the one it last announced.
+That guard is not defensive coding: while a lazy route chunk is downloading,
+React keeps the previous page's markup on screen, so reading the `h1` when the
+pathname changes gets the heading of the page the reader just left. Measured
+during this pass: every route announced the title of the route before it.
 
 ---
 
@@ -333,7 +445,9 @@ rule that can be enforced.
 | `.chip` / `.chip-active` | tags and filters. A `button.chip` gets `--edge` because it is pressable |
 | `.control` | inputs and selects — `--edge` border |
 | `.btn` | buttons — `--edge` border |
-| `.caveat` | data-gap notices only. The 3px left rule is load-bearing: it survives forced-colours and print, where the amber fill does not, so a caveat cannot quietly stop looking like a caveat |
+| `.caveat` | dataset-level data-gap notices only. The 3px left rule is load-bearing: it survives forced-colours and print, where the amber fill does not, so a caveat cannot quietly stop looking like a caveat |
+| `.data-limit` | a limit on **one figure**, inline and adjacent to it. Amber ink and rule, no fill. Never folded, never below `text-sm`. See §1 |
+| `.framing-note` | the correlation-not-causation block. **One per screen**, accent not amber, text from `DISCLAIMER_MEDIUM`. See §1 |
 | `.rows` | list rhythm: hairline separators plus a hover wash |
 | `.zebra` | alternating row wash for long tables. A wash of the well colour, never a tint of the accent, so it never reads as a selected state |
 | `.thead-sticky` | sticky table head, docked under `--header-h` |

@@ -40,7 +40,7 @@ import type { IndustryId } from '@ftm/core/src';
 import { CONFIG, isMain, optionalKey } from './lib/env.js';
 import { getJson, stableId } from './lib/http.js';
 import { db, j, setMeta, upsert } from './lib/db.js';
-import { CCL, CM, CN, ORG_TYPE_HINT, PARTY_LEADERSHIP_CMTE_TYPES, SUPER_PAC_CMTE_TYPES, PAS2, INDEPENDENT_EXPENDITURE_TX_TYPES, fecDate, readBulk } from './lib/fecbulk.js';
+import { CCL, CM, CN, ORG_TYPE_HINT, PARTY_LEADERSHIP_CMTE_TYPES, PARTY_COMMITTEE_TYPES, SUPER_PAC_CMTE_TYPES, PAS2, INDEPENDENT_EXPENDITURE_TX_TYPES, fecDate, readBulk } from './lib/fecbulk.js';
 
 const API = 'https://api.open.fec.gov/v1';
 const now = () => new Date().toISOString();
@@ -115,13 +115,42 @@ async function ingestBulk(cycle: number): Promise<{ candidates: number; committe
   // --- candidate/committee linkage ----------------------------------------
   console.log('  candidate/committee linkage…');
   const committeesByCandidate = new Map<string, string[]>();
+  let rejectedLinks = 0;
   for await (const row of readBulk(cycle, 'ccl')) {
     const cand = row[CCL.CAND_ID], cmte = row[CCL.CMTE_ID];
     if (!cand || !cmte) continue;
+
+    /**
+     * ONLY the candidate's own principal campaign committee.
+     *
+     * The FEC's candidate/committee linkage file links a candidate to every
+     * committee that has ever designated itself as connected to them — which
+     * includes party committees and joint fundraising committees. An earlier
+     * version of this code took all of them, and the consequence was that
+     * $81.9 MILLION of National Republican Senatorial Committee receipts were
+     * reported on this site, under a named sitting senator's photograph, as
+     * "money reported to the FEC — given to Dan Sullivan's campaign", with the
+     * words "exact figure" beside it. Joint fundraising committees produced the
+     * same error for 28 more members.
+     *
+     * That is a false statement of fact about a real person, and it is exactly
+     * the class of error that no amount of careful framing elsewhere can undo.
+     *
+     * designation 'P' is the principal campaign committee. 'J' is joint
+     * fundraising (money raised jointly and split between participants, so
+     * attributing 100% of it to one member overstates their receipts), 'U' is
+     * unauthorised, 'A'/'B'/'D' are authorised/lobbyist/leadership. Committee
+     * types 'X'/'Y'/'Z' are party committees regardless of designation.
+     */
+    const designation = (row[CCL.CMTE_DSGN] ?? '').toUpperCase();
+    const cmteType = (row[CCL.CMTE_TP] ?? '').toUpperCase();
+    if (designation !== 'P' || PARTY_COMMITTEE_TYPES.has(cmteType)) { rejectedLinks++; continue; }
+
     const list = committeesByCandidate.get(cand) ?? [];
     if (!list.includes(cmte)) list.push(cmte);
     committeesByCandidate.set(cand, list);
   }
+  console.log(`  (linked only principal campaign committees; ${rejectedLinks} party, joint-fundraising and other linkages excluded)`);
 
   let candCount = 0;
   db().transaction(() => {
@@ -137,7 +166,7 @@ async function ingestBulk(cycle: number): Promise<{ candidates: number; committe
         office: r[CN.OFFICE] ?? '',
         incumbent_challenge: r[CN.ICI] ?? null,
         cycles: j([cycle]),
-        principal_committee_ids: j(committeesByCandidate.get(id) ?? (r[CN.PCC] ? [r[CN.PCC]] : [])),
+        principal_committee_ids: j(committeesByCandidate.get(id) ?? (r[CN.PCC] ? [r[CN.PCC]] : [])),  // already filtered to designation 'P'
         source: 'openfec',
         source_url: candidatePublicUrl(id, cycle),
         fetched_at: now(),

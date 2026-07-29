@@ -33,6 +33,7 @@ import {
   downloadBlob,
   renderShareCard,
   shareCardAlt,
+  shareEligibility,
   shareCardFilename,
   type ShareCardFinding,
 } from '../lib/sharecard';
@@ -42,11 +43,16 @@ export type { ShareCardFinding };
 export function ShareCardButton({
   finding,
   variant = 'button',
+  showReason = true,
 }: {
   finding: ShareCardFinding;
   variant?: 'button' | 'link';
+  /** See the comment on the refusal branch below before setting this false. */
+  showReason?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Weak findings do not get an image at all — see shareEligibility().
+  const eligibility = shareEligibility(finding);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const close = useCallback(() => {
@@ -54,6 +60,27 @@ export function ShareCardButton({
     // Send focus back where it came from rather than dropping it on <body>.
     triggerRef.current?.focus();
   }, []);
+
+  if (!eligibility.eligible) {
+    /**
+     * `showReason={false}` is for a LIST whose rows mostly share one refusal,
+     * and only when the list states that refusal once above itself.
+     *
+     * A member page printed "No image for this one. The overlap is under 10%,
+     * which is too small to mean anything once the picture is separated from
+     * this page" on every bill card — five identical copies of a sentence that
+     * is about the share feature, not about that bill. Testing counted each one
+     * as a separate hedge, which is exactly how they read.
+     *
+     * The refusal itself is NOT weakened: the button still does not appear, and
+     * `shareEligibility()` is still the only thing that decides. Only the
+     * printing of the sentence moves. See RepDetail.tsx.
+     */
+    if (!showReason) return null;
+    return (
+      <p className="max-w-measure text-xs leading-relaxed text-ink-4">{eligibility.reason}</p>
+    );
+  }
 
   const className =
     variant === 'link'
@@ -257,8 +284,7 @@ function ShareCardDialog({ finding, onClose }: { finding: ShareCardFinding; onCl
               </strong>{' '}
               {PROJECT_REPO_URL_WARNING} Until it is set the watermark reads “
               <span className="mono">{PROJECT_REPO_URL}</span>” rather than linking anywhere, which
-              is honest but not useful. It lives in{' '}
-              <span className="mono">packages/core/src/disclaimer.ts</span>.
+              is honest but not useful.
             </p>
           </div>
         )}

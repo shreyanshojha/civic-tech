@@ -21,12 +21,12 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   DISCLAIMER_LONG,
   DISCLAIMER_MEDIUM,
   DISCLAIMER_PLAIN,
   DISCLAIMER_PLAIN_MORE,
-  DISCLAIMER_SHORT,
   OVERLAP_BAND_LABEL,
   OVERLAP_BAND_NOTE,
   OVERLAP_BAND_PLAIN,
@@ -99,57 +99,64 @@ export function PersistentDisclaimer() {
 }
 
 /**
- * Medium-weight framing, for the top of any page that shows a computed score.
+ * THE framing block for a page. At most one of these per screen.
  *
- * `plain` leads with the short sentence and folds the fuller one behind a tap.
- * Both are always on the page; the difference is only which one a skimmer
- * reads. A caveat that gets skipped because it is four lines long is a caveat
- * that did not happen.
+ * ---------------------------------------------------------------------------
+ * WHAT THIS REPLACED, AND WHY
+ *
+ * There used to be two of these components — `<ShortDisclaimer/>` under the
+ * page title and `<InlineDisclaimer/>` above the score list — and several
+ * pages rendered both. In quick view both printed DISCLAIMER_PLAIN, which is
+ * the *same sentence the sticky banner was already showing*, so a reader could
+ * meet one sentence three times on one screen before reaching a number.
+ *
+ * A usability study found that this did not make anyone more careful. It made
+ * the framing invisible (habituation), and for a reader who already believed
+ * the worst it read as motive rather than as care.
+ *
+ * So: one instance per screen, and it never repeats the banner. The banner
+ * carries DISCLAIMER_PLAIN; this carries DISCLAIMER_MEDIUM, which is the
+ * substantive version — what the tool puts side by side, and the ordinary
+ * reason overlap exists. The reader who reads it gets MORE than they used to,
+ * not less. Both strings still come from @ftm/core and nothing here writes its
+ * own wording.
+ *
+ * This is not amber. Amber means "the data has a gap" (DESIGN.md §1); this is
+ * "here is how to read the page", which is a different claim and must not
+ * borrow the colour that the real data gaps depend on.
+ * ---------------------------------------------------------------------------
  */
-export function InlineDisclaimer({ className = '', plain = false }: { className?: string; plain?: boolean }) {
-  const [open, setOpen] = useState(false);
-  if (!plain) {
-    return (
-      <div className={`caveat px-3 py-2.5 ${className}`}>
-        <p>{DISCLAIMER_MEDIUM}</p>
-      </div>
-    );
-  }
+export function FramingNote({ className = '' }: { className?: string }) {
   return (
-    <div className={`caveat px-3 py-2.5 ${className}`}>
-      <p>
-        <strong className="font-semibold">{DISCLAIMER_PLAIN}</strong>{' '}
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="tap-24 whitespace-nowrap font-medium underline underline-offset-2"
-        >
-          {open ? 'Show less' : 'Why?'}
-        </button>
-      </p>
-      {open && (
-        <>
-          <p className="mt-1.5">{DISCLAIMER_PLAIN_MORE}</p>
-          <p className="mt-1.5">{DISCLAIMER_MEDIUM}</p>
-        </>
-      )}
+    <div className={`framing-note ${className}`} role="note" aria-label="How to read the numbers on this page">
+      <p>{DISCLAIMER_MEDIUM}</p>
     </div>
   );
 }
 
 /**
- * Sits under every page title. It used to be --ink-4 on paper, which measured
- * 3.17:1 — below AA — so the one line every reader needs was the least legible
- * line on the page. It is now --ink-3 with an accent rule marking it as framing
- * rather than as body copy.
+ * A limit on ONE number, sitting next to that number.
+ *
+ * "18% of this member's money could not be matched to an industry" is not
+ * boilerplate — it is the single most decision-relevant sentence on the page,
+ * because it says how much of the figure above is missing. It used to be set
+ * in the smallest type on the site, in the same amber box as the correlation
+ * boilerplate, and was skipped for exactly that reason.
+ *
+ * Rules for this component, all of them learned the hard way:
+ *   - it goes immediately under the figure it qualifies, never in a footnote
+ *     and never inside a <Fold>;
+ *   - it is the same size as the copy around that figure, not a size smaller;
+ *   - it states a fact about the data, never a judgement about a person.
  */
-export function ShortDisclaimer({ className = '', plain = false }: { className?: string; plain?: boolean }) {
-  return (
-    <p className={`border-l-2 border-accent-line pl-2.5 text-sm leading-snug text-ink-2 ${className}`}>
-      {plain ? DISCLAIMER_PLAIN : DISCLAIMER_SHORT}
-    </p>
-  );
+export function DataLimit({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <p className={`data-limit ${className}`}>{children}</p>;
 }
 
 export function LongDisclaimer() {
@@ -239,11 +246,28 @@ export function OverlapScore({
   score,
   size = 'md',
   showExplainer = true,
+  showBandNote = true,
   plain = false,
 }: {
   score: number;
   size?: 'sm' | 'md' | 'lg';
   showExplainer?: boolean;
+  /**
+   * Suppress the one-line band note under the bar.
+   *
+   * ONLY legal in a LIST, and only when the list states the same sentence once
+   * above it — see `bandNoteFor()` below, which is the sanctioned way to build
+   * that statement so the wording still comes from @ftm/core.
+   *
+   * The reason: a member page showing six bills printed "Few or none of this
+   * member's top disclosed donor industries have an obvious stake in this bill"
+   * six times, identically. Six copies of a caveat is not six times the care;
+   * testing found it is how a reader learns to skip the caveat, and how a
+   * distrustful reader reads volume as motive. The band LABEL still travels
+   * with every number, and the accessible name of every bar still carries the
+   * formal band, so nothing is stripped from an individual score.
+   */
+  showBandNote?: boolean;
   /** Quick view: the plain band name and the plain one-line note, same bands. */
   plain?: boolean;
 }) {
@@ -282,10 +306,30 @@ export function OverlapScore({
           />
         ))}
       </div>
-      <p className="mt-1.5 text-xs leading-snug text-ink-3">{bandNote}</p>
+      {showBandNote && <p className="mt-1.5 text-xs leading-snug text-ink-3">{bandNote}</p>}
       {showExplainer && <ScoreExplainer plain={plain} />}
     </div>
   );
+}
+
+/**
+ * The band note for a score, so a list can say once what its rows would
+ * otherwise each say. Wording still comes from @ftm/core; this only picks.
+ */
+export function bandNoteFor(score: number, plain: boolean): string {
+  const band = overlapBand(score);
+  return plain ? OVERLAP_BAND_PLAIN_NOTE[band] : OVERLAP_BAND_NOTE[band];
+}
+
+/** The distinct bands present in a set of scores, in ascending band order. */
+export function distinctBands(scores: number[]): number[] {
+  const order: Record<string, number> = { minimal: 0, some: 1, substantial: 2, high: 3 };
+  const seen = new Map<string, number>();
+  for (const s of scores) {
+    const b = overlapBand(s);
+    if (!seen.has(b)) seen.set(b, s);
+  }
+  return [...seen.entries()].sort((a, b) => order[a[0]] - order[b[0]]).map(([, s]) => s);
 }
 
 /** A visible provenance link. Every figure on this site must be traceable. */
@@ -305,7 +349,32 @@ export function SourceLink({ href, children }: { href: string; children?: React.
   );
 }
 
-/** Amber note used ONLY for data-coverage caveats, never for judgements. */
+/**
+ * Amber note used ONLY for data-coverage caveats, never for judgements.
+ *
+ * The third and broadest tier: "this whole dataset has a gap you need to know
+ * about before you read any of it" — no votes in this bundle, awards truncated
+ * to the largest few thousand, and so on. If what you are writing is a limit on
+ * ONE figure, it belongs in <DataLimit/> next to that figure instead; if it is
+ * the correlation-not-causation framing, it belongs in <FramingNote/> and there
+ * may only be one of those on the screen.
+ */
 export function CoverageNote({ children }: { children: React.ReactNode }) {
   return <div className="caveat px-3 py-2">{children}</div>;
+}
+
+/**
+ * "Something looks wrong on this page?"
+ *
+ * A skeptical reader who spots an error and has nowhere to report it concludes
+ * that nobody wants to hear about errors. Every member and bill page carries
+ * this, pointing at the corrections section on the About page, which names the
+ * primary record to check first and who to contact.
+ */
+export function ReportProblemLink({ className = '' }: { className?: string }) {
+  return (
+    <Link className={`link text-xs text-ink-3 hover:text-accent ${className}`} to="/about">
+      Something looks wrong on this page?
+    </Link>
+  );
 }

@@ -279,7 +279,18 @@ export function isCeremonialMeasure(
   title: string,
   billType: string,
   policyArea?: string | null,
+  subjects: string[] = [],
 ): CeremonialCheck {
+  // The Library of Congress labels these directly. An audit found 18 tribute
+  // and commemorative resolutions still being sector-tagged and scored because
+  // their titles did not match any phrase pattern — including a memorial for
+  // police officers killed in the line of duty, which was tagged "Lawyers &
+  // Lobbyists" and offered a share button. The subject term is authoritative;
+  // check it first.
+  const CEREMONIAL_SUBJECTS = /congressional tributes|commemorative (event|holiday)|anniversaries|awards and medals|memorials/i;
+  if (subjects.some((s) => CEREMONIAL_SUBJECTS.test(s))) {
+    return { ceremonial: true, reason: 'measure the Library of Congress labels as a congressional tribute or commemoration' };
+  }
   const t = (title ?? '').trim();
   if (!t) return { ceremonial: false, reason: null };
 
@@ -303,4 +314,65 @@ export function isCeremonialMeasure(
   }
 
   return { ceremonial: false, reason: null };
+}
+
+
+/**
+ * What kind of measure is this, and does it become law?
+ *
+ * The app previously tested `/res$/i` on the bill type, which matches `hjres`
+ * and `sjres` as well as `hres`/`hconres`, and then told the reader
+ * "a resolution, not a law — it does not become law."
+ *
+ * That is wrong for 409 of the 1,477 measures in a typical dataset. A JOINT
+ * resolution is presented to the President and does become law; that is the
+ * vehicle used for Congressional Review Act repeals and for proposing
+ * constitutional amendments. On one page the label said "not a law" directly
+ * above a summary reading "This joint resolution nullifies the final rule…".
+ */
+export type MeasureKind = 'bill' | 'joint-resolution' | 'simple-resolution' | 'concurrent-resolution';
+
+export interface MeasureType {
+  kind: MeasureKind;
+  label: string;
+  /** One plain sentence a non-expert can act on. */
+  explanation: string;
+  becomesLaw: boolean;
+}
+
+export function measureType(billType: string): MeasureType {
+  const t = (billType ?? '').toLowerCase();
+  if (t === 'hjres' || t === 'sjres') {
+    return {
+      kind: 'joint-resolution',
+      label: 'Joint resolution',
+      explanation:
+        'A joint resolution. It goes to the President like a bill and can become law — this is the vehicle used to repeal a federal rule, or to propose a change to the Constitution.',
+      becomesLaw: true,
+    };
+  }
+  if (t === 'hconres' || t === 'sconres') {
+    return {
+      kind: 'concurrent-resolution',
+      label: 'Concurrent resolution',
+      explanation:
+        'A concurrent resolution. Both chambers vote on it, but it does not go to the President and does not become law. Used for budget frameworks and for the two chambers to state a joint position.',
+      becomesLaw: false,
+    };
+  }
+  if (t === 'hres' || t === 'sres') {
+    return {
+      kind: 'simple-resolution',
+      label: 'Simple resolution',
+      explanation:
+        'A simple resolution. Only one chamber votes on it, and it does not become law. Used for that chamber\'s own rules, and for statements of opinion and tribute.',
+      becomesLaw: false,
+    };
+  }
+  return {
+    kind: 'bill',
+    label: 'Bill',
+    explanation: 'A bill. It becomes law only if both chambers pass it and the President signs it.',
+    becomesLaw: true,
+  };
 }

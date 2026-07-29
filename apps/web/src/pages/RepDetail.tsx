@@ -27,20 +27,76 @@
  * ---------------------------------------------------------------------------
  */
 
-import { useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  INDUSTRY_BY_ID, billLabel, describeOverlap, plainAmount, plainShare, shortDate, usd,
+  INDUSTRIES, INDUSTRY_BY_ID, billLabel, describeOverlap, plainAmount, plainShare, shortDate, usd,
 } from '@ftm/core';
+import type { IndustryId } from '@ftm/core';
 import { getIndex, getMemberDetail } from '../lib/data';
+import type { BillSummary, DonorProfile } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { useViewMode } from '../lib/view';
-import { CoverageNote, InlineDisclaimer, OverlapScore, SourceLink } from '../components/Framing';
+import {
+  CoverageNote, DataLimit, FramingNote, OverlapScore, ReportProblemLink, SourceLink,
+  bandNoteFor, distinctBands,
+} from '../components/Framing';
+import { placesLine, seatLine as seatLineFor } from '../lib/seat';
 import { WhatThisMeans } from '../components/WhatThisMeans';
 import { Empty, ErrorState, IndustryBars, Loading, MemberAvatar, MethodTag, PartyTag, SectionTitle, Stat } from '../components/ui';
 import { ShareCardButton } from '../components/ShareCard';
+import { shareEligibility, type ShareCardFinding } from '../lib/sharecard';
 import { Fold, ViewToggle } from '../components/ViewToggle';
 import { Term } from '../components/Glossary';
+
+/**
+ * The member's relationship to one bill.
+ *
+ * The bill record names the sponsor, so that case is certain. It does not carry
+ * the cosponsor list in the member bundle, so the other two possibilities —
+ * cosponsor, or a seat on a committee of jurisdiction — are reported as the
+ * disjunction they actually are. Picking the more eye-catching of the two would
+ * be a guess dressed as a fact, and the share card repeats this string.
+ */
+function roleFor(bill: { sponsorBioguideId?: string } | null | undefined, bioguideId: string): string {
+  return bill?.sponsorBioguideId === bioguideId ? 'Sponsor' : 'Cosponsor or committee member';
+}
+
+/**
+ * The share-card finding for one overlap row. Extracted so the row and the
+ * one-per-list refusal count are computed from the same object rather than from
+ * two copies that could drift.
+ */
+interface MemberCardContext {
+  bioguideId: string;
+  memberName: string;
+  memberSubtitle: string;
+  cycle: number | null;
+  totalDisclosed: number | null;
+}
+
+function findingFor(
+  o: { billId: string; score: number; matches: { industry: IndustryId; donorAmount: number }[] },
+  bill: BillSummary | null | undefined,
+  ctx: MemberCardContext,
+): ShareCardFinding {
+  const top = o.matches[0] ?? null;
+  return {
+    memberName: ctx.memberName,
+    memberSubtitle: ctx.memberSubtitle,
+    cycle: ctx.cycle,
+    totalDisclosed: ctx.totalDisclosed,
+    billLabel: bill ? billLabel(bill.billType, bill.billNumber) : o.billId,
+    billTitle: bill?.title ?? '',
+    topIndustryLabel: top ? (INDUSTRY_BY_ID[top.industry]?.label ?? top.industry) : null,
+    topIndustryAmount: top?.donorAmount ?? null,
+    score: o.score,
+    role: roleFor(bill, ctx.bioguideId),
+    classificationMethod: bill?.classificationMethod ?? null,
+    isCeremonial: (bill?.industries?.length ?? 0) === 0,
+    topIndustryConfidence: bill?.industries?.[0]?.confidence ?? null,
+  };
+}
 
 const DONOR_KIND_LABEL: Record<string, string> = {
   committee: 'PAC / committee',
@@ -88,6 +144,214 @@ function SectorGlance({
   );
 }
 
+/**
+ * "Is my senator taking pharma money?" — answered, including when the answer
+ * is no.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS
+ *
+ * A reader came to this page with one sector in mind. That sector was not among
+ * the member's three largest, so it appeared nowhere on the page — not as a
+ * zero, not as an empty row, not at all. He read the silence as concealment and
+ * left certain of something the data does not say. The page had no way to say
+ * "no", so a reader who needed "no" invented "yes".
+ *
+ * `donorProfile.byIndustry` is the member's COMPLETE breakdown — every sector
+ * with any money in it, not the top-three truncation the list pages read — so
+ * this control can answer definitively. There are exactly three true answers
+ * and it gives whichever one applies:
+ *
+ *   - a figure, with the share it is of their total;
+ *   - a plain negative — nothing from this sector is in the money we traced;
+ *   - "we could not tell", when so much of the money has no industry attached
+ *     that even the plain negative would mislead.
+ *
+ * ---------------------------------------------------------------------------
+ * THE THRESHOLD, AND WHY THE OLD ONE NEVER FIRED
+ *
+ * This control promised three answers and shipped two. The gate was
+ * `unclassifiedShare >= 0.05` — five per cent of the member's TOTAL money — and
+ * in this bundle the minimum unclassifiedShare across all 531 members with a
+ * donor profile is 10.9%. Zero members were under 5%. So every negative came
+ * out as "we could not tell", every single time, for every sector, for every
+ * member. A reader who came to ask one question got a hedge, which is precisely
+ * the register a distrustful reader reads as evasion.
+ *
+ * Measured over the 531 members in this bundle:
+ *
+ *   unclassifiedShare (the old denominator)   min 10.9%  p25 54.1%  median 64.2%  p95 89.6%
+ *   unresolvedShare   (the one used here)     min  3.6%  p25 28.7%  median 35.9%  p95 51.3%
+ *
+ * The denominator changed because the two halves of "unattributed" are not the
+ * same kind of thing, and the export already keeps them apart:
+ *
+ *   nonEmployerAmount — the filing says RETIRED / SELF-EMPLOYED / NOT EMPLOYED /
+ *     HOMEMAKER. There is no employer written down, so NO tool can ever put this
+ *     money in a sector. It is unattributable by construction, for everyone,
+ *     forever. It cannot be concealing pharma money, because it is not
+ *     concealing anything — the box on the form is empty. Bundle-wide it is
+ *     36.9% of all disclosed money, which is most of why the old gate was
+ *     unreachable.
+ *   unresolvedAmount — an employer IS named and this tool failed to place it.
+ *     THIS is the money that could be hiding the sector the reader asked about,
+ *     and this is what the threshold is measured against.
+ *
+ * 25% is the chosen line. Below it, at least three of every four dollars that
+ * carry a name were placed, so a sector showing zero placed dollars is far more
+ * likely to be genuinely absent than to be sitting unrecognised in the
+ * remainder. It sits just under the first quartile (28.7%), and comfortably
+ * above the point where the distribution's thin left tail ends and the bulk
+ * begins (20%: 4 members per 5-point bucket below it, 46 in the bucket above).
+ * 80 of 531 members — 15% — fall under it, so the third answer now actually
+ * reaches readers instead of being unreachable.
+ *
+ * Being honest about the rest: for the other 85% the answer really is "we could
+ * not tell", and the copy says so plainly rather than dressing a hedge up as an
+ * answer. Both branches state the figure they turn on. An OpenFEC key and a
+ * language model both shrink `unresolvedAmount`, which moves members across
+ * this line — the number is a property of the bundle, not of any member.
+ *
+ * NOTE that the plain negative is worded as a claim about the TRACED money, not
+ * about the member: "nothing from this sector appears in the money we could
+ * trace" is true by construction whenever the sector row is empty. The
+ * threshold decides whether that is the headline or the footnote, not whether
+ * it is true.
+ * ---------------------------------------------------------------------------
+ */
+/**
+ * Share of a member's total that has an employer named on the filing which this
+ * tool could not place. Above this, a zero for one sector cannot be reported as
+ * an absence. See the block comment above for the distribution behind it.
+ */
+const CANNOT_TELL_THRESHOLD = 0.25;
+
+function SectorCheck({ profile, memberName }: { profile: DonorProfile; memberName: string }) {
+  const [sectorId, setSectorId] = useState<IndustryId | ''>('');
+  const selectId = `sector-check-${useId().replace(/:/g, '')}`;
+
+  const row = sectorId ? profile.byIndustry.find((r) => r.industry === sectorId) : undefined;
+  const meta = sectorId ? INDUSTRY_BY_ID[sectorId] : undefined;
+  const label = meta?.label ?? sectorId;
+  const unattributedPct = (profile.unclassifiedShare * 100).toFixed(0);
+  // The gate. Employer-named money this tool failed to place, over the total.
+  const unresolvedShare =
+    profile.totalItemized > 0 ? profile.unresolvedAmount / profile.totalItemized : 1;
+  const unresolvedPct = (unresolvedShare * 100).toFixed(0);
+  const canRuleOut = unresolvedShare < CANNOT_TELL_THRESHOLD;
+
+  let answer: React.ReactNode = null;
+  if (sectorId) {
+    if (row && row.amount > 0) {
+      answer = (
+        <p className="text-md leading-snug text-ink-0">
+          <Link className="font-semibold hover:text-accent" to={`/industries/${sectorId}`}>{label}</Link>{' '}
+          — <span className="tnum font-semibold">{usd(row.amount)}</span> reported{' '}
+          <span className="tnum text-ink-2">({(row.share * 100).toFixed(1)}% of their money)</span>
+        </p>
+      );
+    } else if (canRuleOut) {
+      // The clear negative, and it LEADS. The qualification is one line, after
+      // it, in the quieter tier — not wrapped around it.
+      answer = (
+        <>
+          <p className="text-md leading-snug text-ink-0">
+            <Link className="font-semibold hover:text-accent" to={`/industries/${sectorId}`}>{label}</Link>{' '}
+            — <span className="font-semibold">nothing from this sector appears in the money we
+            could trace.</span>
+          </p>
+          <p className="mt-1 max-w-measure-wide text-sm leading-snug text-ink-2">
+            <span className="tnum">{unresolvedPct}%</span> of {memberName}’s money names an employer
+            this tool could not place, which is low enough to say that plainly.
+            {/*
+              The honest edge case. A member can have a LOW unresolved share and a
+              very HIGH total unattributed share, because most of their money came
+              from filings with no employer written at all. "Nothing from this
+              sector" is then true of every donor who named an employer — but a
+              retired donor is still a person who used to work somewhere, and no
+              filing says where. Saying so costs one sentence and prevents the
+              reader hearing a stronger negative than the data supports.
+            */}
+            {Number(unattributedPct) >= 60 && (
+              <>
+                {' '}A separate <span className="tnum">{unattributedPct}%</span> of their money comes
+                from filings with no employer written on them, so it cannot be checked against this
+                sector — by this tool or any other.
+              </>
+            )}
+          </p>
+        </>
+      );
+    } else {
+      answer = (
+        <>
+          <p className="text-md leading-snug text-ink-0">
+            <Link className="font-semibold hover:text-accent" to={`/industries/${sectorId}`}>{label}</Link>{' '}
+            — <span className="font-semibold">we could not tell.</span> None of the money we placed
+            came from this sector.
+          </p>
+          <p className="mt-1 max-w-measure-wide text-sm leading-snug text-ink-2">
+            But <span className="tnum">{unresolvedPct}%</span> of {memberName}’s money names an
+            employer this tool could not place — too much to call this sector absent. This is a limit
+            of this tool, not something about {memberName}.
+          </p>
+        </>
+      );
+    }
+  }
+
+  return (
+    <div className="card-data p-4">
+      <h2 className="label mb-1">Check a specific industry</h2>
+      {/* "The sectors above are only the largest ones" is the sentence the
+          .data-limit immediately above this card already makes, in the marked
+          tier, attached to the figure it qualifies. Saying it again here in
+          unmarked prose was the second of two copies, not a second fact. What
+          is left is instruction: what this control does. */}
+      <p className="mb-2.5 max-w-measure-wide text-sm leading-snug text-ink-2">
+        Pick any sector — not just the largest — and this will give you the straight answer for it,
+        including when the answer is that nothing is there.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor={selectId} className="text-sm text-ink-2">
+          Sector
+        </label>
+        <select
+          id={selectId}
+          value={sectorId}
+          onChange={(e) => setSectorId(e.target.value as IndustryId | '')}
+          className="control h-9 max-w-full px-2 text-sm"
+        >
+          <option value="">Pick a sector…</option>
+          {INDUSTRIES.map((i) => (
+            <option key={i.id} value={i.id}>{i.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div role="status" aria-live="polite" className="mt-3 min-h-[2.5rem]">
+        {answer ?? (
+          <p className="text-sm text-ink-3">No sector picked yet.</p>
+        )}
+      </div>
+
+      {sectorId && (
+        <DataLimit className="mt-2.5">
+          This answer covers money reported to the FEC and itemized for the {profile.cycle} cycle,
+          and nothing else. Money that was never reported cannot appear in it.
+          {profile.unclassifiedShare > 0 && (
+            <>
+              {' '}Of the {unattributedPct}% with no industry attached, the {unresolvedPct}% above is
+              the part that names an employer; the rest names none at all, and no tool can place
+              that.
+            </>
+          )}
+        </DataLimit>
+      )}
+    </div>
+  );
+}
+
 export default function RepDetail() {
   const { bioguideId = '' } = useParams();
   const { data, error, loading } = useAsync(() => getMemberDetail(bioguideId), [bioguideId]);
@@ -122,11 +386,12 @@ export default function RepDetail() {
   const isSenator = member.chamber === 'Senate';
   const districtStr = member.district === undefined ? '' : String(member.district);
   const atLarge = !isSenator && (districtStr === '' || districtStr === '0');
-  const seatLine = isSenator
-    ? `Senator · ${member.state}`
-    : atLarge
-      ? `Representative · ${member.state} at-large`
-      : `Representative · ${member.state}-${districtStr}`;
+  // "Representative · AL-4 · Cullman, Jasper, Tuscumbia". The towns are the
+  // only human-readable geography in the data, and a reader who arrived from a
+  // list of district numbers needs them here to confirm they opened the right
+  // person. See lib/seat.ts.
+  const seatLine = seatLineFor(member);
+  const offices = placesLine(member.districtPlaces);
   // Same string the share card and every other surface uses for this person.
   const memberSubtitle = isSenator
     ? `Sen. ${member.state}`
@@ -136,6 +401,39 @@ export default function RepDetail() {
   const topOverlap = overlaps[0] ?? null;
   const topSectors = (donorProfile?.byIndustry ?? []).filter((r) => r.amount > 0).slice(0, 3);
   const shownOverlaps = isQuick ? overlaps.slice(0, 3) : overlaps;
+  const cardContext: MemberCardContext = {
+    bioguideId: member.bioguideId,
+    memberName: member.name,
+    memberSubtitle,
+    cycle,
+    totalDisclosed: donorProfile?.totalItemized ?? null,
+  };
+  /**
+   * The band note(s) for the whole overlap list, said once instead of per row.
+   * Wording still comes from @ftm/core; `bandNoteFor` only picks which string.
+   */
+  const bandLines = distinctBands(shownOverlaps.map((o) => o.score))
+    .map((score) => bandNoteFor(score, isQuick));
+
+  /**
+   * Why some of these bills get no share image, counted and said once.
+   *
+   * `shareEligibility()` still decides per bill and still hides the button per
+   * bill — nothing about the refusal changes. What changed is that its
+   * explanation used to be printed on every refused row, and on a page where
+   * every overlap is under 10% that is the same sentence five times.
+   */
+  // Not a useMemo: this sits below the loading/error early returns, so a hook
+  // here would change the hook order between renders. It is a loop over at most
+  // a few dozen rows.
+  const shareRefusals = (() => {
+    const counts = new Map<string, number>();
+    for (const o of shownOverlaps) {
+      const e = shareEligibility(findingFor(o, o.bill, cardContext));
+      if (!e.eligible && e.reason) counts.set(e.reason, (counts.get(e.reason) ?? 0) + 1);
+    }
+    return [...counts.entries()];
+  })();
   const shownDonors = isQuick ? topDonors.slice(0, 5) : topDonors;
   const shownAwards = isQuick ? districtAwards.slice(0, 5) : districtAwards;
 
@@ -183,7 +481,7 @@ export default function RepDetail() {
         <h2 className="sr-only">At a glance</h2>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]">
           <div className="card-data p-4">
-            <div className="label">Money reported to the FEC</div>
+            <h3 className="label">Money reported to the FEC</h3>
             <div className="tnum mt-1 text-2xl font-semibold leading-tight text-ink-0">
               {plainAmount(donorProfile?.totalItemized ?? 0)}
             </div>
@@ -198,28 +496,53 @@ export default function RepDetail() {
                 <>No campaign money is linked to this member in this data. That is a gap in the data, not a claim that none was raised.</>
               )}
             </p>
+            {/* ---------------------------------------------------------------
+                This sentence used to end "So the shares here are a floor: the
+                real ones are higher." That is an assertion — on 537 named
+                people's pages — that each of their true industry shares is
+                larger than the one shown. It is not supported. Most of the
+                unattributed money is filings that list the donor as RETIRED,
+                SELF-EMPLOYED, NOT EMPLOYED or HOMEMAKER: there is no employer
+                on the form, so that money can never be moved into ANY industry,
+                and the shares would not rise if the tool were perfect. The rest
+                of the codebase words this correctly as "a floor, not a
+                measurement", and now so does this.                          */}
             {donorProfile && donorProfile.unclassifiedShare > 0 && (
-              <p className="mt-2 text-xs leading-snug text-ink-3">
-                Of that money, {plainShare(donorProfile.unclassifiedShare)} could not be matched to
-                any industry. So the shares here are a floor: the real ones are higher.
-              </p>
+              <DataLimit className="mt-2">
+                <span className="tnum">{(donorProfile.unclassifiedShare * 100).toFixed(0)}%</span> of
+                this money has no industry attached, so read every share below as a floor, not a
+                measurement.
+                {donorProfile.nonEmployerAmount > 0 && (
+                  <>
+                    {' '}
+                    <span className="tnum">{usd(donorProfile.nonEmployerAmount)}</span> of it is from
+                    filings with no employer written on them — retired, self-employed, homemaker.
+                    That is normal and it is not hidden money; it can never be assigned to an
+                    industry by anyone.
+                  </>
+                )}
+              </DataLimit>
             )}
           </div>
 
           <div className="card-data p-4">
-            <div className="label mb-2">Where most of it came from</div>
+            {/* Was "Where most of it came from", above a figure the page itself
+                describes as "about a tenth of it". "Most" was simply wrong. */}
+            <h3 className="label mb-2">Largest industries we could identify</h3>
             {topSectors.length === 0 ? (
               <p className="text-sm text-ink-2">No money here could be put in an industry.</p>
             ) : (
               <SectorGlance rows={topSectors} />
             )}
-            <p className="mt-2.5 text-xs leading-snug text-ink-3">
-              Industries are worked out from what donors write as their employer, so they are rough.
-            </p>
+            <DataLimit className="mt-2.5">
+              These are the three largest of {donorProfile?.byIndustry.length ?? 0} sectors, not the
+              whole list, and each is worked out from what donors wrote as their employer. A sector
+              missing from these three is not a sector with nothing reported — use the check below.
+            </DataLimit>
           </div>
 
           <div className="card-data p-4">
-            <div className="label mb-2">Biggest overlap with a bill</div>
+            <h3 className="label mb-2">Biggest overlap with a bill</h3>
             {topOverlap ? (
               <>
                 <Link to={`/bills/${topOverlap.billId}`} className="tap-24 block text-sm leading-snug text-ink-1 hover:text-accent">
@@ -239,6 +562,15 @@ export default function RepDetail() {
             )}
           </div>
         </div>
+
+        {/* The one control that lets the page say "no". Directly under the
+            at-a-glance block, because the question it answers is the question
+            most readers arrive with. */}
+        {donorProfile && donorProfile.totalItemized > 0 && (
+          <div className="mt-4">
+            <SectorCheck profile={donorProfile} memberName={member.name} />
+          </div>
+        )}
       </section>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -276,54 +608,94 @@ export default function RepDetail() {
                     value={usd(donorProfile.totalItemized - donorProfile.unclassifiedAmount, { compact: true })}
                     sub={`${((1 - donorProfile.unclassifiedShare) * 100).toFixed(1)}% of the total`}
                   />
-                  <Stat
-                    label="Not placed"
-                    value={usd(donorProfile.unclassifiedAmount, { compact: true })}
-                    sub={`${(donorProfile.unclassifiedShare * 100).toFixed(1)}% — left out of every number below`}
-                  />
+                </div>
+
+                {/* ---------------------------------------------------------
+                    ITEM 3: the resolution goes NEXT TO the number, not in a
+                    different card.
+
+                    This block used to be a third <Stat/> reading
+                    "NOT PLACED $828.7K — 82.8%, left out of every number
+                    below", with the explanation of what that money actually is
+                    two cards further down. A distrustful reader met a large
+                    number, the words "left out", and no account of it, and drew
+                    the only conclusion available: the missing money is being
+                    hidden. Testing watched exactly that happen.
+
+                    So the figure and its account are now one block, and the
+                    account leads with the half that is nobody's fault: filings
+                    with no employer written on them can never be assigned to an
+                    industry by ANY tool, including a perfect one. The other
+                    half is this tool's own gap and is named as such. Both
+                    figures were already in donorProfile; nothing here is new
+                    data and nothing was removed — the two amber notes that used
+                    to carry these sentences are merged into this one place, so
+                    the fact travels with the number instead of chasing it. */}
+                <div className="mt-4 border-l-2 border-ink-5 pl-3">
+                  <div className="label">Not placed in any industry</div>
+                  <div className="tnum mt-0.5 text-lg font-semibold leading-tight text-ink-0">
+                    {usd(donorProfile.unclassifiedAmount, { compact: true })}
+                  </div>
+                  <div className="mt-0.5 text-xs leading-snug text-ink-4">
+                    {(donorProfile.unclassifiedShare * 100).toFixed(1)}% of the total — left out of
+                    every industry number on this page
+                  </div>
+                  <DataLimit className="mt-2">
+                    <strong className="font-semibold">
+                      This is not money that went missing, and it is not money anyone is hiding.
+                    </strong>{' '}
+                    <span className="tnum">{usd(donorProfile.nonEmployerAmount)}</span> of it comes
+                    from filings with no employer written on them at all — the donor is recorded as
+                    RETIRED, SELF-EMPLOYED, NOT EMPLOYED or HOMEMAKER. That is how the filing was
+                    written, it is entirely normal, and it means there is no employer name for{' '}
+                    <em>any</em> tool to match to an industry. A perfect version of this site would
+                    still not be able to place it.
+                    {donorProfile.nonEmployerAmount === 0 && (
+                      <> In this member’s data that figure is zero because only committee (PAC) money
+                      is here; detail on individual donors needs a free OpenFEC API key.</>
+                    )}{' '}
+                    The other <span className="tnum">{usd(donorProfile.unresolvedAmount)}</span>{' '}
+                    <em>does</em> name an employer or group, and neither the word list nor the
+                    classifier could match it to an industry. That part is a real limitation of this
+                    tool, and it is the reason every share on this page is a floor rather than a
+                    measurement.
+                  </DataLimit>
                 </div>
 
                 <div className="mt-5">
-                  <div className="label mb-2">By industry</div>
+                  <h3 className="label mb-2">By industry</h3>
                   <IndustryBars rows={donorProfile.byIndustry} />
-                  <p className="mt-2 text-xs leading-relaxed text-ink-3">
+                  <DataLimit className="mt-2">
                     Shares are of the full reported total, so they add up to less than 100% by
-                    exactly the amount we could not place.
-                  </p>
+                    exactly the {(donorProfile.unclassifiedShare * 100).toFixed(1)}% that could not
+                    be placed. A sector that is absent from this list had nothing reported for it in
+                    the {donorProfile.cycle} cycle.
+                  </DataLimit>
                 </div>
 
-                {/* The two coverage gaps, never collapsed into one number. */}
-                <div className="mt-4 space-y-2">
-                  <CoverageNote>
-                    <strong className="font-semibold">
-                      {usd(donorProfile.nonEmployerAmount)} has no employer to sort.
-                    </strong>{' '}
-                    The filing lists the donor as RETIRED, SELF-EMPLOYED, NOT EMPLOYED or HOMEMAKER,
-                    so there is no employer name to match to an industry. That is how the filing was
-                    written, not a mistake by this tool.
-                    {donorProfile.nonEmployerAmount === 0 && (
-                      <> In this data that figure is zero because only committee (PAC) money is
-                      here; detail on individual donors needs a free OpenFEC API key.</>
-                    )}
-                  </CoverageNote>
-
-                  <CoverageNote>
-                    <strong className="font-semibold">
-                      {usd(donorProfile.unresolvedAmount)} could not be placed.
-                    </strong>{' '}
-                    There is an employer or group name on the filing, but neither the word list nor
-                    the classifier could match it to an industry. That is a real gap in this tool,
-                    and the reason every industry share here should be read as a floor.
-                  </CoverageNote>
-                </div>
+                {/* The two coverage gaps used to be two amber boxes here,
+                    repeating verbatim the two sentences that now sit attached
+                    to the "Not placed" figure above. Both figures and every
+                    fact from both boxes are still on this page — moved, not
+                    dropped — and they are now next to the number they qualify
+                    rather than three scroll-lengths under it. */}
               </Fold>
             )}
           </section>
 
           {/* ---- top donors ----------------------------------------------- */}
           <section>
+            {/* ---------------------------------------------------------------
+                "Biggest donors" over a column headed DONOR was wrong for most
+                of these rows. A committee row IS a donor — a PAC is a real
+                entity that really made a contribution. But an individual row is
+                not: it is the EMPLOYER NAME that one or more individuals typed
+                on their own filings, aggregated. Heading that column "donor"
+                said that a company gave money to a federal candidate, which
+                corporations are prohibited from doing. The table now names what
+                is actually in it, and the Kind column distinguishes the two. */}
             <SectionTitle note={isQuick && topDonors.length > shownDonors.length ? `${shownDonors.length} of ${topDonors.length}` : `${topDonors.length} shown`}>
-              Biggest donors
+              Biggest employers named on filings
             </SectionTitle>
             {topDonors.length === 0 ? (
               <Empty>
@@ -335,11 +707,11 @@ export default function RepDetail() {
                 <table className="w-full min-w-[34rem] text-sm">
                   <thead>
                     <tr className="text-left text-2xs uppercase tracking-wide text-ink-3">
-                      <th className="pb-1 font-semibold">Donor</th>
-                      <th className="pb-1 font-semibold">Industry</th>
-                      <th className="pb-1 font-semibold">Kind</th>
-                      <th className="pb-1 text-right font-semibold">Amount</th>
-                      <th className="pb-1 text-right font-semibold">Source</th>
+                      <th scope="col" className="pb-1 font-semibold">Employer on filing</th>
+                      <th scope="col" className="pb-1 font-semibold">Industry</th>
+                      <th scope="col" className="pb-1 font-semibold">Kind</th>
+                      <th scope="col" className="pb-1 text-right font-semibold">Amount</th>
+                      <th scope="col" className="pb-1 text-right font-semibold">Source</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -366,13 +738,23 @@ export default function RepDetail() {
             )}
             {isQuick && topDonors.length > shownDonors.length && (
               <button type="button" onClick={() => setView('full')} className="btn mt-3">
-                Show all {topDonors.length} donors
+                Show all {topDonors.length} rows
               </button>
             )}
-            <p className="mt-2 text-xs leading-relaxed text-ink-3">
-              Amounts are added up per donor, per industry, over the cycle. A donor who gives through
-              more than one committee can appear more than once.
-            </p>
+            {/* One note under this table, not two. Both were limits on how to
+                read the same five columns — what a row IS, and how the Amount
+                column was totalled — and printing them as two separate marked
+                blocks is the caveat-density problem in miniature. Every
+                sentence from both is still here. */}
+            <DataLimit className="mt-2">
+              A row marked <Term k="pac">PAC / committee</Term> is a real committee that made a real
+              contribution under its own name. A row marked <strong className="font-medium">Individual</strong>{' '}
+              is not one donor: it is the employer name that people typed on their own filings, added
+              up. The company did not give the money — its employees did, individually. Companies are
+              barred by law from contributing to federal candidates at all. Amounts are added up per
+              name, per industry, over the cycle, so a committee that gives through more than one
+              entity can appear more than once.
+            </DataLimit>
           </section>
 
           {/* ---- overlap -------------------------------------------------- */}
@@ -386,7 +768,41 @@ export default function RepDetail() {
             >
               Bills they worked on, next to their donors
             </SectionTitle>
-            <InlineDisclaimer className="mb-4" plain={isQuick} />
+            {/* The one framing block on this page. It used to print the exact
+                sentence the sticky banner was already showing two inches below
+                it, which is how a reader learns to stop reading both. */}
+            <FramingNote className="mb-4" />
+
+            {/* ---------------------------------------------------------------
+                ONE band statement for the whole list, not one per row.
+
+                Every row carried its own copy of the same sentence — "Few or
+                none of this member's top disclosed donor industries have an
+                obvious stake in this bill" — printed six times, identically,
+                down one page. Testing counted it as six separate hedges, and
+                that is how it read: a reader does not experience six copies as
+                six times the care, they experience it as noise and stop reading
+                the seventh thing, which might have been the one that mattered.
+
+                Nothing is deleted. The sentence still comes from @ftm/core, it
+                is still shown, and every bar below still carries its band label
+                and the formal band in its accessible name. It is said once, for
+                the set, and the set is almost always one band. When it is not,
+                one line per band appears — still bounded by four, not by the
+                number of bills. */}
+            {shownOverlaps.length > 0 && (
+              <div className="mb-4 max-w-measure-wide space-y-1 text-sm leading-relaxed text-ink-2">
+                {bandLines.map((line) => <p key={line}>{line}</p>)}
+                {shareRefusals.map(([reason, n]) => (
+                  <p key={reason} className="text-ink-3">
+                    {n === shownOverlaps.length
+                      ? `None of these ${shownOverlaps.length} can be turned into a share image. `
+                      : `${n} of these ${shownOverlaps.length} cannot be turned into a share image. `}
+                    {reason.replace(/^No image for this one\.\s*/, '')}
+                  </p>
+                ))}
+              </div>
+            )}
 
             {overlaps.length === 0 ? (
               <Empty>
@@ -400,30 +816,20 @@ export default function RepDetail() {
                   const label = bill ? billLabel(bill.billType, bill.billNumber) : o.billId;
                   const top = o.matches[0] ?? null;
                   const topLabel = top ? (INDUSTRY_BY_ID[top.industry]?.label ?? top.industry) : null;
-                  /**
-                   * The member's relationship to this bill.
-                   *
-                   * The bill record names the sponsor, so that case is certain. It
-                   * does not carry the cosponsor list in the member bundle, so the
-                   * other two possibilities — cosponsor, or a seat on a committee
-                   * of jurisdiction — are reported as the disjunction they actually
-                   * are. Picking the more eye-catching of the two would be a guess
-                   * dressed as a fact, and the share card repeats this string.
-                   */
-                  const role =
-                    bill?.sponsorBioguideId === member.bioguideId
-                      ? 'Sponsor'
-                      : 'Cosponsor or committee member';
+                  const role = roleFor(bill, member.bioguideId);
                   return (
                     <li key={o.billId} className="card p-4">
-                      <div className="flex flex-wrap items-baseline gap-x-2">
+                      {/* A real heading, so this list is navigable by heading
+                          and so the h4s inside <WhatThisMeans/> below sit at a
+                          legal level rather than jumping h2 → h4. */}
+                      <h3 className="flex flex-wrap items-baseline gap-x-2 font-normal">
                         <Link to={`/bills/${o.billId}`} className="tap-24 mono shrink-0 text-xs text-ink-4 hover:text-accent">
                           {label}
                         </Link>
                         <Link to={`/bills/${o.billId}`} className="tap-24 text-base leading-snug text-ink-1 hover:text-accent">
                           {bill?.title ?? 'Title not in this data'}
                         </Link>
-                      </div>
+                      </h3>
 
                       {bill && (
                         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
@@ -474,26 +880,24 @@ export default function RepDetail() {
                             defaultOpen={!isQuick}
                           />
                           <div className="mt-3">
-                            <ShareCardButton
-                              finding={{
-                                memberName: member.name,
-                                memberSubtitle,
-                                billLabel: label,
-                                billTitle: bill?.title ?? '',
-                                topIndustryLabel: topLabel,
-                                topIndustryAmount: top?.donorAmount ?? null,
-                                score: o.score,
-                                cycle,
-                                role,
-                                totalDisclosed: donorProfile?.totalItemized ?? null,
-                                classificationMethod: bill?.classificationMethod ?? null,
-                              }}
-                            />
+                            {/* The refusal reason is stated once above this
+                                list, not on every row that gets refused. The
+                                refusal itself is unchanged. */}
+                            <ShareCardButton showReason={false} finding={findingFor(o, bill, cardContext)} />
                           </div>
                         </div>
 
                         <div className="sm:w-56">
-                          <OverlapScore score={o.score} size="md" showExplainer={false} plain={isQuick} />
+                          {/* Band note suppressed: stated once above the
+                              list. The label and the accessible name still
+                              carry the band on every bar. */}
+                          <OverlapScore
+                            score={o.score}
+                            size="md"
+                            showExplainer={false}
+                            showBandNote={false}
+                            plain={isQuick}
+                          />
                         </div>
                       </div>
                     </li>
@@ -527,9 +931,11 @@ export default function RepDetail() {
               </CoverageNote>
             ) : (
               <Fold open={!isQuick} title={`${votes.length} recorded vote${votes.length === 1 ? '' : 's'}`}>
-                <p className="mb-2 text-sm text-ink-2">
+                <p className="mb-2 max-w-measure-wide text-sm leading-relaxed text-ink-2">
                   A <Term k="rollCall">roll-call vote</Term> is one where each member is recorded by
-                  name.
+                  name. Where a vote has an overlap score beside it, that score does not use the vote
+                  and the vote is not explained by the score — said here once, rather than under
+                  every row.
                 </p>
                 <ul className="divide-y divide-line">
                   {votes.map((v) => {
@@ -549,11 +955,13 @@ export default function RepDetail() {
                         </div>
                         {o && top && (
                           <div className="mt-2 sm:max-w-sm">
-                            <OverlapScore score={o.score} size="sm" showExplainer={false} plain={isQuick} />
+                            {/* Band note and the "the number does not use the
+                                vote" sentence are both stated once above this
+                                list rather than on every vote. */}
+                            <OverlapScore score={o.score} size="sm" showExplainer={false} showBandNote={false} plain={isQuick} />
                             <p className="mt-1 text-xs text-ink-3">
                               Biggest shared industry on this bill:{' '}
-                              {INDUSTRY_BY_ID[top.industry]?.label ?? top.industry}. The number does
-                              not use the vote, and the vote is not explained by the number.
+                              {INDUSTRY_BY_ID[top.industry]?.label ?? top.industry}.
                             </p>
                           </div>
                         )}
@@ -625,7 +1033,7 @@ export default function RepDetail() {
         {/* ---- sidebar ----------------------------------------------------- */}
         <aside className="space-y-4">
           <div className="card p-4">
-            <div className="label mb-2">The basics</div>
+            <h3 className="label mb-2">The basics</h3>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-3">Chamber</dt>
@@ -635,6 +1043,12 @@ export default function RepDetail() {
                 <dt className="text-ink-3">Seat</dt>
                 <dd className="text-ink-1">{atLarge && !isSenator ? `${member.state} at-large` : isSenator ? member.state : `${member.state}-${districtStr}`}</dd>
               </div>
+              {offices && (
+                <div className="flex justify-between gap-3">
+                  <dt className="shrink-0 text-ink-3">District offices</dt>
+                  <dd className="text-right text-ink-1">{offices}</dd>
+                </div>
+              )}
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-3">Party</dt>
                 <dd className="flex items-center gap-1.5 text-ink-1">{member.party ?? '—'} <PartyTag party={member.party} /></dd>
@@ -688,13 +1102,25 @@ export default function RepDetail() {
           </div>
 
           <div className="card p-4">
-            <div className="label mb-2">What this page cannot tell you</div>
-            <p className="text-xs leading-relaxed text-ink-2">
+            <h3 className="label mb-2">What this page cannot tell you</h3>
+            <p className="text-sm leading-relaxed text-ink-2">
               It sees only reported <Term k="hardMoney">hard money</Term> that was big enough to be{' '}
               <Term k="itemized">itemized</Term> in a filing. It cannot see dark money, most{' '}
               <Term k="superpac">super PAC</Term> spending, lobbying, or a job someone takes after
               leaving office.{' '}
               <Link className="link" to="/limitations">The full list of gaps →</Link>
+            </p>
+          </div>
+
+          <div className="card p-4">
+            <h3 className="label mb-2">Found a mistake?</h3>
+            <p className="text-sm leading-relaxed text-ink-2">
+              Every figure on this page links to the government record it came from, so the first
+              step is to open that record and compare. If this page and the filing disagree, that is
+              a bug here and it should be reported.
+            </p>
+            <p className="mt-2">
+              <ReportProblemLink />
             </p>
           </div>
         </aside>

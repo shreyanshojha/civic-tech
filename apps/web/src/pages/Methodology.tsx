@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { OVERLAP_FORMULA, SCORE_EXPLAINER, usd } from '@ftm/core';
 import { getIndex } from '../lib/data';
 import { useAsync } from '../lib/hooks';
-import { CoverageNote, OverlapScore, ShortDisclaimer } from '../components/Framing';
+import { CoverageNote, FramingNote, OverlapScore } from '../components/Framing';
 import { Empty, ErrorState, Loading, SectionTitle, Stat } from '../components/ui';
 
 /**
@@ -76,7 +76,7 @@ export default function Methodology() {
         page describes each step, names the file it came from, and works one score out by hand so the
         arithmetic can be checked rather than trusted.
       </p>
-      <ShortDisclaimer className="mt-2" />
+      <FramingNote className="mt-2 max-w-measure-wide" />
 
       {/* ---- this bundle -------------------------------------------------- */}
       <section className="mt-8">
@@ -469,13 +469,15 @@ score = 0.166666… + 0.033333… = 0.20`}
           <code className="mono">apps/web/public/data</code> and can be inspected directly with any
           JSON viewer.
         </p>
+        {/* Repository paths are not useful to a reader and are actively
+            confusing to one who has no repository — they read as jargon, or as
+            a reference to something they were not given. The property that
+            matters to a reader is the one stated here. */}
         <p className="mt-3 max-w-measure-wide text-sm leading-relaxed text-ink-3">
-          The formula lives in <code className="mono">packages/core/src/overlap.ts</code>, the sector
-          taxonomy in <code className="mono">packages/core/src/industries.ts</code>, the framing
-          language in <code className="mono">packages/core/src/disclaimer.ts</code>, and the export
-          step in <code className="mono">packages/ingest/src/export.ts</code>. This page imports the
-          formula and the explainer from that first file rather than restating them, so it cannot
-          quietly fall out of date with the code.
+          The overlap formula, the sector taxonomy and the framing language each live in exactly one
+          place in the code, and this page imports the formula and the explainer from that place
+          rather than restating them — so the arithmetic described here cannot quietly fall out of
+          step with the arithmetic that produced the numbers.
         </p>
         <p className="mt-4 text-sm text-ink-4">
           <Link className="link" to="/limitations">What this tool cannot do →</Link> ·{' '}

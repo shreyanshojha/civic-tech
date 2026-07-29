@@ -14,6 +14,15 @@
  *     source of truth for that wording and is rendered on screen, next to the
  *     input, not in a tooltip and not after the fact. Do not duplicate or
  *     paraphrase that text in a view.
+ *
+ *     `headline` and `assurance` are rendered UNCONDITIONALLY, always visible,
+ *     above the button that sends anything. The rest — `body`, `optOut` and the
+ *     two links — sits behind a "What happens to my address?" disclosure in the
+ *     same block. That is a change of placement, not of prominence: the eleven
+ *     lines of it used to sit ABOVE the input and pushed the input itself below
+ *     the fold on a 375px phone, so the control the notice is about could not be
+ *     seen at the same time as the notice. Nothing was removed and nothing may
+ *     be. If you fold `headline` or `assurance` away too, you have broken rule 1.
  *  2. No key, no account, no tracking parameter. The Census geocoder is a free,
  *     keyless, public federal service.
  *  3. The address is never stored, never logged, never put in the URL, and
@@ -26,7 +35,10 @@
  *  - US-only, and street addresses only. The service does not geocode Guam,
  *    American Samoa, the Northern Mariana Islands or the US Virgin Islands, and
  *    coverage of Puerto Rico is patchy — so a delegate's constituent may get no
- *    match at all. Name search is the fallback and always works offline.
+ *    match at all. Name AND TOWN search is the fallback and always works
+ *    offline — see `DISTRICT_LOOKUP_FALLBACK`, which every failure path points
+ *    at, because "find your member by name" is no help to someone who does not
+ *    know the name.
  *  - It can take several seconds on a cold cache. Callers must show progress.
  * ---------------------------------------------------------------------------
  */
@@ -34,6 +46,9 @@
 /** Shown on screen BEFORE the user can run a lookup. Single source of truth. */
 export const CENSUS_LOOKUP_NOTICE = {
   headline: 'Your address is sent to the US Census Bureau, and to nothing else.',
+  /** The always-visible one-liner. Never folded. */
+  assurance:
+    'It is not stored, not logged, and not put in the page address. You do not have to use this box at all.',
   body:
     'If you use this box, the address you type is sent to the US Census Bureau’s public geocoding service (geocoding.geo.census.gov) so it can tell us which congressional district it falls in. It is sent to no other party. This app does not store it, log it, put it in the page address, or attach it to anything you look at afterwards — it stays in your browser until you close the tab. The Census Bureau is a federal agency and operates under its own privacy policy.',
   optOut:
@@ -41,6 +56,28 @@ export const CENSUS_LOOKUP_NOTICE = {
   privacyPolicyUrl: 'https://www.census.gov/about/policies/privacy.html',
   serviceDocsUrl: 'https://geocoding.geo.census.gov/geocoder/',
 } as const;
+
+/**
+ * The offline answer to "which district is mine?", said in one place.
+ *
+ * Every failure path of this lookup used to end at "find your member by name",
+ * which is useless to the person who is here precisely because she does not
+ * know her member's name. The bundle ships the towns each member keeps a
+ * district office in, so the real fallback is to type a town — and it needs no
+ * network, no service and no address.
+ *
+ * Kept next to the code that fails, so a new failure mode cannot be written
+ * without the fallback attached to it.
+ */
+export const DISTRICT_LOOKUP_FALLBACK = {
+  headline: 'You can find your district without this box.',
+  body:
+    'Type the name of your town into the member search below — "Cullman", "Brooklyn", "Tuscumbia". Every member is listed with the towns their district offices are in, so searching a place name finds the people who sit there. That search runs on the file already in your browser and sends nothing anywhere.',
+} as const;
+
+/** The one-line version, used inside a failure hint. */
+const TOWN_FALLBACK_HINT =
+  'You can also type your town name into the member search below — members are listed with the towns their district offices are in, and that search sends nothing anywhere.';
 
 /** State/territory FIPS code → USPS abbreviation. */
 export const STATE_FIPS_TO_USPS: Record<string, string> = {
@@ -246,7 +283,7 @@ export async function lookupDistrict(
       ok: false,
       kind: 'empty-input',
       message: 'Enter a street address before looking it up.',
-      hint: 'A house number, street, city and state works best — for example “350 Fifth Ave, New York, NY”.',
+      hint: `A house number, street, city and state works best — for example “350 Fifth Ave, New York, NY”. ${TOWN_FALLBACK_HINT}`,
     };
   }
 
@@ -270,7 +307,7 @@ export async function lookupDistrict(
         ok: false,
         kind: 'service-error',
         message: `The Census Bureau geocoder answered with an error (HTTP ${res.status}).`,
-        hint: 'This is a free federal service and it does go down. Search by name in the box above in the meantime, or try again in a few minutes.',
+        hint: `This is a free federal service and it does go down. Try again in a few minutes — or skip it entirely. ${TOWN_FALLBACK_HINT}`,
       };
     }
     payload = await res.json();
@@ -284,14 +321,14 @@ export async function lookupDistrict(
         ok: false,
         kind: 'timeout',
         message: 'The Census Bureau geocoder did not answer in time.',
-        hint: 'It is often slow on a first request. Try once more, or find your member by name or state instead.',
+        hint: `It is often slow on a first request. Try once more — or skip it entirely. ${TOWN_FALLBACK_HINT}`,
       };
     }
     return {
       ok: false,
       kind: 'unreachable',
       message: 'Could not reach the Census Bureau geocoding service.',
-      hint: 'You may be offline, or a network policy may be blocking geocoding.geo.census.gov. Everything else on this site works without a connection — search by name or filter by state.',
+      hint: `You may be offline, or a network policy may be blocking geocoding.geo.census.gov. Everything else on this site works without a connection. ${TOWN_FALLBACK_HINT}`,
     };
   } finally {
     clearTimeout(timer);
@@ -306,7 +343,7 @@ export async function lookupDistrict(
       ok: false,
       kind: 'no-match',
       message: 'The Census Bureau could not find that address.',
-      hint: 'It only covers the United States, and it wants a street address rather than a place name or a bare ZIP code. Guam, American Samoa, the Northern Mariana Islands and the US Virgin Islands are not in it at all, and Puerto Rico is only partly covered. Try adding the city and state, or find your member by name.',
+      hint: `It only covers the United States, and it wants a street address rather than a place name or a bare ZIP code. Guam, American Samoa, the Northern Mariana Islands and the US Virgin Islands are not in it at all, and Puerto Rico is only partly covered. Try adding the city and state. ${TOWN_FALLBACK_HINT}`,
     };
   }
 
@@ -325,7 +362,7 @@ export async function lookupDistrict(
       ok: false,
       kind: 'no-district',
       message: `We found “${matchedAddress}”, but the Census Bureau returned no congressional district for it.`,
-      hint: 'This happens for addresses that fall in unassigned water area, and for parts of the territories. Pick your state below instead.',
+      hint: `This happens for addresses that fall in unassigned water area, and for parts of the territories. ${TOWN_FALLBACK_HINT}`,
     };
   }
 

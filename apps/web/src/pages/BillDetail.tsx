@@ -28,12 +28,12 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  INDUSTRY_BY_ID, billLabel as fmtBillLabel, describeOverlap, plainAmount, plainShare, shortDate, usd,
+  INDUSTRY_BY_ID, billLabel as fmtBillLabel, describeOverlap, measureType, plainAmount, plainShare, shortDate, usd,
 } from '@ftm/core';
 import { getBillDetail, getLegislators } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { useViewMode } from '../lib/view';
-import { CoverageNote, InlineDisclaimer, OverlapScore, SourceLink } from '../components/Framing';
+import { CoverageNote, DataLimit, FramingNote, OverlapScore, ReportProblemLink, SourceLink } from '../components/Framing';
 import { Empty, ErrorState, IndustryBars, Loading, MemberAvatar, MethodTag, PartyTag, SectionTitle } from '../components/ui';
 import { ShareCardButton } from '../components/ShareCard';
 import { Fold, ViewToggle } from '../components/ViewToggle';
@@ -66,7 +66,7 @@ export default function BillDetail() {
   const { bill, classification, overlaps, votes } = data;
   const isKeywordOnly = classification?.method === 'keyword-fallback';
   const prettyLabel = fmtBillLabel(bill.billType, bill.billNumber);
-  const isResolution = /res$/i.test(bill.billType);
+  const measure = measureType(bill.billType);
 
   /**
    * ΣC — the denominator of the bill weights.
@@ -110,12 +110,9 @@ export default function BillDetail() {
           <span className="sr-only"> — {bill.title}</span>
         </h1>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
-          <span>
-            {isResolution ? (
-              <>A <Term k="hres">resolution</Term>, not a law</>
-            ) : (
-              <>A <Term k="hr">bill</Term> — it becomes law only if both chambers pass it</>
-            )}
+          <span title={measure.explanation}>
+            {measure.label} —{' '}
+            {measure.becomesLaw ? 'can become law' : 'does not become law'}
           </span>
           <span className="mono">{bill.congress}th Congress</span>
           {bill.introducedDate && <span>Introduced {shortDate(bill.introducedDate)}</span>}
@@ -194,10 +191,11 @@ export default function BillDetail() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 max-w-measure-wide text-xs leading-relaxed text-ink-3">
+                <DataLimit className="mt-2">
                   The percentage says <Term k="confidence">how sure this tool is</Term> of the tag.
-                  It is not about any member, and not about money.
-                </p>
+                  It is not about any member, and not about money. An industry that is not tagged
+                  here was not judged relevant to this bill — it is not a gap in the list.
+                </DataLimit>
 
                 <Fold className="mt-3" open={!isQuick} title="Why each industry was tagged">
                   <ul className="space-y-2.5">
@@ -260,7 +258,8 @@ export default function BillDetail() {
             >
               Members on this bill, and who funded them
             </SectionTitle>
-            <InlineDisclaimer className="mb-4" plain={isQuick} />
+            {/* The one framing block on this page. */}
+            <FramingNote className="mb-4" />
 
             {overlaps.length === 0 ? (
               <Empty>
@@ -279,10 +278,15 @@ export default function BillDetail() {
                       <div className="flex flex-wrap items-start gap-3">
                         <MemberAvatar src={o.member?.imageUrl} name={o.member?.name ?? o.bioguideId} size={48} />
                         <div className="min-w-0 flex-1">
+                          {/* A real heading, so a screen-reader user can jump
+                              between the members on this bill instead of
+                              reading the whole list to find one. */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <Link to={`/reps/${o.bioguideId}`} className="tap-24 text-base font-medium text-ink-0 hover:text-accent">
-                              {o.member?.name ?? o.bioguideId}
-                            </Link>
+                            <h3 className="text-base font-medium leading-snug text-ink-0">
+                              <Link to={`/reps/${o.bioguideId}`} className="tap-24 hover:text-accent">
+                                {o.member?.name ?? o.bioguideId}
+                              </Link>
+                            </h3>
                             <span className="chip">
                               {o.member?.role === 'Cosponsor' ? (
                                 <Term k="cosponsor">Cosponsor</Term>
@@ -360,6 +364,11 @@ export default function BillDetail() {
                             role: o.member?.role ?? null,
                             totalDisclosed: profile?.totalItemized ?? null,
                             classificationMethod: classification?.method ?? null,
+                            // A bill with no sector tags at all is either
+                            // ceremonial or unclassifiable; either way there is
+                            // nothing here that should become an image.
+                            isCeremonial: (classification?.industries.length ?? 0) === 0,
+                            topIndustryConfidence: classification?.industries[0]?.confidence ?? null,
                           }}
                         />
                         {profile?.sourceUrls[0] && <SourceLink href={profile.sourceUrls[0]}>FEC filings</SourceLink>}
@@ -382,17 +391,17 @@ export default function BillDetail() {
                               the footer note, and share × weight = contribution
                               on every row.                                   */}
                           <div className="min-w-0">
-                            <div className="label mb-1.5">Shared industries, and what each added to the number</div>
+                            <h4 className="label mb-1.5">Shared industries, and what each added to the number</h4>
                             <div className="scroll-x -mx-1 px-1">
                               <table className="w-full min-w-[30rem] text-sm">
                                 <thead>
                                   <tr className="text-left text-2xs uppercase tracking-wide text-ink-3">
-                                    <th className="pb-1 font-semibold">Sector</th>
-                                    <th className="pb-1 text-right font-semibold">Given to member</th>
-                                    <th className="pb-1 text-right font-semibold">Share of their money <span className="normal-case">(D)</span></th>
-                                    <th className="pb-1 text-right font-semibold">Classifier confidence <span className="normal-case">(C)</span></th>
-                                    <th className="pb-1 text-right font-semibold">Weight <span className="normal-case">(C ÷ ΣC)</span></th>
-                                    <th className="pb-1 text-right font-semibold">Adds <span className="normal-case">(D × weight)</span></th>
+                                    <th scope="col" className="pb-1 font-semibold">Sector</th>
+                                    <th scope="col" className="pb-1 text-right font-semibold">Disclosed from donors in it</th>
+                                    <th scope="col" className="pb-1 text-right font-semibold">Share of their money <span className="normal-case">(D)</span></th>
+                                    <th scope="col" className="pb-1 text-right font-semibold">Classifier confidence <span className="normal-case">(C)</span></th>
+                                    <th scope="col" className="pb-1 text-right font-semibold">Weight <span className="normal-case">(C ÷ ΣC)</span></th>
+                                    <th scope="col" className="pb-1 text-right font-semibold">Adds <span className="normal-case">(D × weight)</span></th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-line">
@@ -435,20 +444,28 @@ export default function BillDetail() {
 
                           {profile && (
                             <div>
-                              <div className="label mb-1.5">
+                              <h4 className="label mb-1.5">
                                 Everything this member reported, cycle {profile.cycle}
-                              </div>
+                              </h4>
                               <IndustryBars rows={profile.byIndustry.slice(0, 10)} />
-                              <p className="mt-2 text-xs leading-relaxed text-ink-3">
-                                {usd(profile.unresolvedAmount)} ({(profile.unclassifiedShare * 100).toFixed(1)}% of the
-                                total) could not be put in any sector, and is left out of the number above.
-                                {profile.nonEmployerAmount > 0 && <> Another {usd(profile.nonEmployerAmount)} came from filings with no employer written on them.</>}
-                              </p>
+                              <DataLimit className="mt-2">
+                                <span className="tnum">{usd(profile.unclassifiedAmount)}</span> (
+                                {(profile.unclassifiedShare * 100).toFixed(1)}% of the total) has no
+                                sector attached and is left out of the number above.
+                                {profile.nonEmployerAmount > 0 && (
+                                  <>
+                                    {' '}
+                                    <span className="tnum">{usd(profile.nonEmployerAmount)}</span> of
+                                    that is filings with no employer written on them, which is normal
+                                    and can never be assigned to a sector by anyone.
+                                  </>
+                                )}
+                              </DataLimit>
                             </div>
                           )}
 
                           <div>
-                            <div className="label mb-1">Exact formula</div>
+                            <h4 className="label mb-1">Exact formula</h4>
                             <p className="mono text-2xs leading-relaxed text-ink-3">{o.method.formula}</p>
                           </div>
                         </div>
@@ -555,11 +572,11 @@ export default function BillDetail() {
         {/* ---- sidebar: the short facts, always open ------------------- */}
         <aside className="space-y-4">
           <div className="card-data p-4">
-            <div className="label mb-2">In short</div>
+            <h3 className="label mb-2">In short</h3>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-3">Kind</dt>
-                <dd className="text-right text-ink-1">{isResolution ? 'Resolution' : 'Bill'}</dd>
+                <dd className="text-right text-ink-1" title={measure.explanation}>{measure.label}</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-3">Industries tagged</dt>
@@ -584,11 +601,22 @@ export default function BillDetail() {
           </div>
 
           <div className="card p-4">
-            <div className="label mb-2">What this page cannot tell you</div>
-            <p className="text-xs leading-relaxed text-ink-2">
+            <h3 className="label mb-2">What this page cannot tell you</h3>
+            <p className="text-sm leading-relaxed text-ink-2">
               It sees only money that was reported to the FEC. It cannot see dark money, lobbying
               spending, or a job offer after someone leaves office.{' '}
               <Link className="link" to="/limitations">The full list of gaps →</Link>
+            </p>
+          </div>
+
+          <div className="card p-4">
+            <h3 className="label mb-2">Found a mistake?</h3>
+            <p className="text-sm leading-relaxed text-ink-2">
+              The bill text, the summary and every money figure on this page link to the government
+              record behind them. If this page and that record disagree, the page is wrong.
+            </p>
+            <p className="mt-2">
+              <ReportProblemLink />
             </p>
           </div>
         </aside>

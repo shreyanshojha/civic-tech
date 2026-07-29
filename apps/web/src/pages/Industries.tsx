@@ -48,7 +48,7 @@ import { INDUSTRIES, usd } from '@ftm/core';
 import type { Industry, IndustryId } from '@ftm/core';
 import { getAwards, getBills, getIndustries, getLegislators } from '../lib/data';
 import { useAsync } from '../lib/hooks';
-import { CoverageNote, ShortDisclaimer } from '../components/Framing';
+import { CoverageNote, DataLimit, FramingNote } from '../components/Framing';
 import { Fold, ViewToggle } from '../components/ViewToggle';
 import { useViewMode } from '../lib/view';
 import { Empty, ErrorState, Loading, SectionTitle, Stat } from '../components/ui';
@@ -129,9 +129,19 @@ export default function Industries() {
     return out;
   }, [rows, sort]);
 
+  /**
+   * The prose used to say "31 broad groups of employers" (the whole taxonomy)
+   * while the stat card five inches below it said "27 Sectors" (the taxonomy
+   * minus `other` and the three buckets that are not industries). Two numbers
+   * for the same thing on one screen is the kind of contradiction that costs a
+   * reader confidence in every other number on the page, and it costs it for
+   * free. Both now come from this one array.
+   */
   const sectorRows = sorted.filter((r) => r.meta.id !== 'other' && !NON_INDUSTRY.includes(r.meta.id));
   const bucketRows = sorted.filter((r) => NON_INDUSTRY.includes(r.meta.id));
   const otherRow = rows.find((r) => r.meta.id === 'other');
+  const sectorCount = sectorRows.length;
+  const nonSectorCount = taxonomy.length - sectorCount;
 
   const totals = useMemo(() => {
     const attributed = (legislators.data ?? []).reduce((s, l) => s + (l.donorSummary?.totalItemized ?? 0), 0);
@@ -149,43 +159,50 @@ export default function Industries() {
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">Sectors</h1>
       <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">
-        {taxonomy.length} broad groups of employers. Pick one to see the bills it touches, the
-        members it funds most, and the federal money going the other way. The groups are rough on
-        purpose — they are built from what donors write on their own filings.
+        {sectorCount} broad groups of employers, plus {nonSectorCount} groups that are not industries
+        at all. Pick one to see the bills it touches, the members it funds most, and the federal
+        money going the other way. The groups are rough on purpose — they are built from what donors
+        write on their own filings.
       </p>
-      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      <FramingNote className="mt-2 max-w-measure-wide" />
       <ViewToggle className="mt-3" />
 
       {/* ---- headline figures ------------------------------------------- */}
       <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-5 sm:grid-cols-4">
-        <Stat label="Sectors" value={sectorRows.length} sub="Not counting the three groups below that are not industries." />
+        <Stat label="Sectors" value={sectorCount} sub={`Plus ${nonSectorCount} groups that are not industries — listed below.`} />
         <Stat
           label="Money counted here"
-          value={usd(totals.counted, { compact: true })}
-          sub={`At least this much. It is ${(totals.share * 100).toFixed(0)}% of the ${usd(totals.attributed, { compact: true })} reported to sitting members — see the note below.`}
+          value={`≥ ${usd(totals.counted, { compact: true })}`}
+          sub={`${(totals.share * 100).toFixed(0)}% of the ${usd(totals.attributed, { compact: true })} reported to sitting members.`}
         />
         <Stat label="Bills tagged" value={(bills.data ?? []).filter((b) => b.industries.length > 0).length.toLocaleString()} sub={`out of ${(bills.data ?? []).length.toLocaleString()} bills here`} />
         <Stat label="Federal awards" value={(awards.data ?? []).length.toLocaleString()} sub="Background only. Not linked to any donation." />
       </div>
 
-      <div className="mt-5">
-      <CoverageNote>
-        <strong className="font-semibold">Read the money column as “at least this much”.</strong>{' '}
-        Some of the money is missing from every row below — about{' '}
-        {((1 - totals.share) * 100).toFixed(0)}% of it.
-      </CoverageNote>
-      </div>
-
-      <Fold className="mt-3" open={!isQuick} title="Why some of the money is missing here">
-      <CoverageNote>
-        <strong className="font-semibold">Read the money column as “at least this much”.</strong> The
-        bundle ships only each member's three largest donor sectors in the shared file this page
-        reads, so a sector's fourth-place-and-below money is not counted here. That leaves roughly{' '}
-        {((1 - totals.share) * 100).toFixed(0)}% of the money attributed to sitting members outside
-        every row below. Sectors that give a little to very many members are undercounted relative to
-        sectors that dominate a few members' funding. The complete, untruncated breakdown for any
-        individual is on that member's own page.
-      </CoverageNote>
+      {/* ---------------------------------------------------------------------
+          This was two amber boxes, one of them folded, opening with the SAME
+          sentence — "Read the money column as 'at least this much'." — and the
+          folded one repeating it in full before adding the mechanism. The limit
+          it describes is a fact about the money column right above it, so it
+          now sits inline next to that column at the size of the copy around it,
+          stated once, with the mechanism folded under it rather than repeated.
+      */}
+      <DataLimit className="mt-3">
+        <strong className="font-semibold">
+          Every money figure below is “at least this much”, not a total.
+        </strong>{' '}
+        About {((1 - totals.share) * 100).toFixed(0)}% of the money reported to sitting members is
+        outside every row here.
+      </DataLimit>
+      <Fold className="mt-1" open={!isQuick} title="Why some of the money is missing from these rows">
+        <p className="max-w-measure-wide text-sm leading-relaxed text-ink-2">
+          The shared file this page reads ships only each member's three largest donor sectors, so a
+          sector's fourth-place-and-below money is not counted here at all. Sectors whose donors spread a
+          little across very many members are therefore undercounted relative to sectors whose donors
+          dominate a few members' funding, and the ranking is closer to “which sectors dominate
+          somebody's funding” than to “which sectors account for the most money”. The complete, untruncated breakdown for
+          any individual is on that member's own page.
+        </p>
       </Fold>
 
       {/* ---- the non-industry buckets ------------------------------------ */}
@@ -291,7 +308,7 @@ export default function Industries() {
                     {r.bills} bill{r.bills === 1 ? '' : 's'} tagged
                   </span>
                   <span className="tnum">
-                    a top-three funder for {r.members} member{r.members === 1 ? '' : 's'}
+                    a top-three source for {r.members} member{r.members === 1 ? '' : 's'}
                   </span>
                   {r.awardCount > 0 && (
                     <span className="tnum">
@@ -308,18 +325,14 @@ export default function Industries() {
         )}
       </section>
 
-      <p className="mt-8 max-w-measure-wide text-xs leading-relaxed text-ink-4">
-        {taxonomy.length} buckets is a choice, not a limit of the data. Employer strings in FEC filings
-        are self-reported free text — “SELF”, “N/A”, “RETIRED”, an employer name spelled four different ways — and
-        a finer taxonomy would project precision that does not exist in the source.{' '}
+      <p className="mt-8 max-w-measure-wide text-sm leading-relaxed text-ink-3">
+        {taxonomy.length} buckets in all is a choice, not a limit of the data. Employer strings in FEC
+        filings are self-reported free text — “SELF”, “N/A”, “RETIRED”, an employer name spelled four
+        different ways — and a finer taxonomy would project precision that does not exist in the
+        source. The labels and descriptions on this page are the same ones the ingestion pipeline
+        classified against, so what you read here is exactly what the classifier used.{' '}
         <Link className="link" to="/methodology">How sectors get assigned</Link> ·{' '}
         <Link className="link" to="/limitations">What this cannot tell you</Link>
-      </p>
-
-      <p className="mt-3 text-xs text-ink-4">
-        Sector labels and descriptions come from{' '}
-        <span className="mono">packages/core/src/industries.ts</span>, the same file the ingestion
-        pipeline classifies against — so what you read here is exactly what the classifier used.
       </p>
     </div>
   );

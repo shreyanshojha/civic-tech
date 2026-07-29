@@ -162,8 +162,15 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
             compact ? 'h-8 text-sm' : 'h-10 text-base'
           }`}
         />
+        {/* A lone "/" glyph read out after the search field's own label is
+            noise — it is a hint about a physical keyboard shortcut, drawn for
+            people who can see it sitting inside the box. The shortcut itself
+            still works. */}
         {!compact && (
-          <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-edge px-1.5 py-0.5 text-2xs text-ink-3 sm:block">
+          <kbd
+            aria-hidden
+            className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-edge px-1.5 py-0.5 text-2xs text-ink-3 sm:block"
+          >
             /
           </kbd>
         )}
@@ -180,9 +187,30 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[60vh] overflow-auto rounded border border-edge bg-paper-raised shadow-lg"
         >
           {results.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-ink-3">
-              Nothing matches “{debounced}”. Try a surname, a bill number like “hr 1234”, or a sector.
-            </p>
+            <div className="px-3 py-3">
+              <p className="text-sm text-ink-3">
+                Nothing matches “{debounced}”. Try a surname, a bill number like “hr 1234”, or a
+                sector.
+              </p>
+              {/* This box searches an index of members, bills, sectors and award
+                  recipients. It does not and cannot resolve an address — and a
+                  reader who types one and is told only "nothing matches"
+                  reasonably concludes the site has nothing for them, when in
+                  fact the tool that answers their question is one page away.
+                  Shown always, because a query that looks like an address is not
+                  reliably detectable and the pointer is cheap either way. */}
+              <p className="mt-2 border-t border-line pt-2 text-sm leading-relaxed text-ink-2">
+                Typed an address or a town? This box does not handle those.{' '}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { setOpen(false); setQ(''); navigate('/reps'); }}
+                  className="tap-24 font-medium text-accent underline decoration-accent-line underline-offset-2"
+                >
+                  Find your representatives by address or town →
+                </button>
+              </p>
+            </div>
           ) : (
             <ul className="divide-y divide-line">
               {results.map((r, i) => (

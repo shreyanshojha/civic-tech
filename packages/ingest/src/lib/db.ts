@@ -45,6 +45,7 @@ function migrate(d: Database.Database) {
     official_url TEXT,
     fec_candidate_ids TEXT NOT NULL DEFAULT '[]',
     terms TEXT NOT NULL DEFAULT '[]',
+    district_places TEXT NOT NULL DEFAULT '[]',
     source TEXT NOT NULL,
     source_url TEXT NOT NULL,
     fetched_at TEXT NOT NULL
@@ -191,6 +192,18 @@ function migrate(d: Database.Database) {
     resolved_at TEXT NOT NULL
   );
   `);
+
+  addColumnIfMissing(d, 'legislators', 'district_places', "TEXT NOT NULL DEFAULT '[]'");
+}
+
+/**
+ * Adds a column to an existing table when it is missing.
+ * Keeps `npm run ingest` working on a database created by an older version
+ * rather than forcing a full re-download.
+ */
+function addColumnIfMissing(d: Database.Database, table: string, column: string, ddl: string) {
+  const cols = d.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
 }
 
 export function setMeta(key: string, value: string) {

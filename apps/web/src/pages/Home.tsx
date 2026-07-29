@@ -192,7 +192,7 @@ export default function Home() {
               sub={`Bills from the ${idx.congress}th Congress — the one sitting now.`}
             />
             <Stat
-              label="Money given"
+              label="Money reported"
               value={plainAmount(idx.counts.contributionDollars ?? 0)}
               // The exact wording comes from the bundle, because what this
               // figure covers depends on whether the pipeline ran with an
@@ -223,7 +223,7 @@ export default function Home() {
         <div>
           <SectionTitle>What you can see here</SectionTitle>
           <ul className="space-y-1.5 text-base leading-snug text-ink-2">
-            <li>· Which industries gave a member money, and how much.</li>
+            <li>· Which industries the money reported to a member came from, and how much.</li>
             <li>· Which industries a bill would affect, and why we think so.</li>
             <li>· Where those two lists match.</li>
             <li>· A link to the government filing behind every number.</li>
@@ -246,9 +246,9 @@ export default function Home() {
           A few pairs worth a look
         </SectionTitle>
         <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
-          In each pair, the industries that gave a member money are also industries the bill would
-          affect. That is often completely ordinary: members work on the industries in their own
-          area. Read these as questions, not answers.
+          In each pair, the industries a member's reported money came from are also industries the
+          bill would affect. That is often completely ordinary: members work on the industries in
+          their own area. Read these as questions, not answers.
         </p>
 
         {listLoading ? (
@@ -291,7 +291,7 @@ export default function Home() {
                       <Link className="link" to={`/industries/${o.matches[0].industry}`}>
                         {INDUSTRY_BY_ID[o.matches[0].industry]?.label ?? o.matches[0].industry}
                       </Link>{' '}
-                      · {plainAmount(o.matches[0].donorAmount)} given
+                      · {plainAmount(o.matches[0].donorAmount)} disclosed
                     </p>
                   )}
                 </li>
@@ -422,7 +422,7 @@ export default function Home() {
             </div>
             <div>
               <dt className="font-semibold text-ink-1">Sector</dt>
-              <dd>A rough group of employers, like “Banking &amp; Finance”. We build these groups from what donors write on their filings, so they are approximate.</dd>
+              <dd>A rough group of employers, like “Banking &amp; Finance”. These groups are built from what donors write on their own filings, so they are approximate — and a sector is a label on a donor, never an entity that gave anything. Companies cannot give to federal candidates at all.</dd>
             </div>
             <div>
               <dt className="font-semibold text-ink-1">Overlap</dt>

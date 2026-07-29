@@ -42,6 +42,16 @@ export interface MemberSummary {
   imageUrl?: string;
   officialUrl?: string;
   fecCandidateIds: string[];
+  /**
+   * Towns this member keeps a district office in, e.g. ["Cullman","Jasper"].
+   *
+   * 535 of the 537 members in the bundle have at least one. It is the only
+   * human-readable geography in the data and it is what lets a reader who does
+   * not know their district number find their own member offline. Optional
+   * because an older bundle, generated before the field existed, will not have
+   * it — every consumer must tolerate its absence rather than render "undefined".
+   */
+  districtPlaces?: string[];
   sourceUrl: string;
   fetchedAt: string;
   committees: { committeeCode: string; committeeName: string; role?: string }[];

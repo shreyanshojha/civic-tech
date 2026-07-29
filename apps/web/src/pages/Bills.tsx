@@ -5,7 +5,7 @@ import type { IndustryId } from '@ftm/core';
 import { getBills, getLegislators } from '../lib/data';
 import { useAsync, useDebounced } from '../lib/hooks';
 import { Empty, ErrorState, Loading, MethodTag, SectionTitle } from '../components/ui';
-import { ShortDisclaimer } from '../components/Framing';
+import { FramingNote } from '../components/Framing';
 import { ViewToggle } from '../components/ViewToggle';
 import { Term } from '../components/Glossary';
 import { parseView, useViewMode } from '../lib/view';
@@ -84,7 +84,9 @@ export default function Bills() {
         Bills from the Congress sitting now. Each one is tagged with the industries it would affect.
         This tool adds those tags, not Congress. Open any bill to see what it does in plain words.
       </p>
-      <ShortDisclaimer className="mt-2" plain={isQuick} />
+      {/* One framing block on this page — and not the sentence the sticky
+          banner is already showing at the foot of the screen. */}
+      <FramingNote className="mt-2 max-w-measure-wide" />
       <ViewToggle className="mt-3" />
 
       {/* ---- controls ---------------------------------------------------- */}

@@ -96,23 +96,47 @@ interface UsLegislator {
   terms: { type: string; start: string; end?: string; state: string; district?: number; party?: string; url?: string }[];
 }
 
-async function ingestMembers(): Promise<{ members: number; withFec: number }> {
+interface DistrictOffice { id: { bioguide: string }; offices?: { city?: string; state?: string }[] }
+
+async function ingestMembers(): Promise<{ members: number; withFec: number; withPlaces: number }> {
   const data = await getJson<UsLegislator[]>(`${US_DATA}/legislators-current.json`, {
     label: 'legislators-current', ttlHours: 24 * 3,
   });
 
+  /**
+   * District office cities — the answer to "which one of these is mine?"
+   *
+   * A phone user was asked to find her own representative. The address lookup
+   * needs a network call, and when it failed the fallback was a list reading
+   * "NY-2, NY-8, NY-10, NY-12, NY-13, NY-26" with no other geography. Nobody
+   * knows their district number — finding it out was the whole task — so she
+   * picked a senator by mistake and left.
+   *
+   * A member's district office cities are the places they actually sit in, are
+   * published in the same public-domain dataset, and turn an unusable number
+   * into "NY-12 · New York". No API key, no extra service.
+   */
+  const offices = await safeGet<DistrictOffice[]>(`${US_DATA}/legislators-district-offices.json`, 'district offices', 24 * 7);
+  const placesByBioguide = new Map<string, string[]>();
+  for (const o of offices ?? []) {
+    const cities = [...new Set((o.offices ?? []).map((x) => x.city).filter((c): c is string => Boolean(c)))];
+    if (cities.length) placesByBioguide.set(o.id.bioguide, cities.slice(0, 4));
+  }
+
   const stmt = upsert('legislators', 'bioguide_id', [
     'bioguide_id', 'name', 'first_name', 'last_name', 'chamber', 'state', 'district', 'party',
-    'image_url', 'official_url', 'fec_candidate_ids', 'terms', 'source', 'source_url', 'fetched_at',
+    'image_url', 'official_url', 'fec_candidate_ids', 'terms', 'district_places', 'source', 'source_url', 'fetched_at',
   ]);
 
   let withFec = 0;
+  let withPlaces = 0;
   const tx = db().transaction(() => {
     for (const m of data) {
       const term = m.terms[m.terms.length - 1];
       if (!term) continue;
       const fec = m.id.fec ?? [];
       if (fec.length) withFec++;
+      if (placesByBioguide.has(m.id.bioguide)) withPlaces++;
       stmt.run({
         bioguide_id: m.id.bioguide,
         name: m.name.official_full ?? `${m.name.first ?? ''} ${m.name.last ?? ''}`.trim(),
@@ -126,6 +150,7 @@ async function ingestMembers(): Promise<{ members: number; withFec: number }> {
         official_url: term.url ?? `https://www.congress.gov/member/${m.id.bioguide}`,
         fec_candidate_ids: j(fec),
         terms: j(m.terms.slice(-3)),
+        district_places: j(placesByBioguide.get(m.id.bioguide) ?? []),
         source: 'congress',
         source_url: `https://www.congress.gov/member/${m.id.bioguide}`,
         fetched_at: now(),
@@ -133,7 +158,7 @@ async function ingestMembers(): Promise<{ members: number; withFec: number }> {
     }
   });
   tx();
-  return { members: data.length, withFec };
+  return { members: data.length, withFec, withPlaces };
 }
 
 /**
@@ -434,8 +459,8 @@ export async function ingestCongress(): Promise<void> {
     console.log('');
   }
 
-  const { members, withFec } = await ingestMembers();
-  console.log(`  ${members} current members (${withFec} with published FEC candidate IDs)`);
+  const { members, withFec, withPlaces } = await ingestMembers();
+  console.log(`  ${members} current members (${withFec} with published FEC candidate IDs, ${withPlaces} with district office cities)`);
 
   const roster = await ingestCommitteeRosters();
   console.log(`  ${roster} committee seats`);

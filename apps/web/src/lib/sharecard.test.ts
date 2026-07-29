@@ -209,17 +209,34 @@ describe('card copy', () => {
   it('states the facts side by side without asserting cause', () => {
     const headline = buildHeadline(FINDING);
     expect(headline).toBe(
-      'Electric utilities gave $187.4K of the $452.0K disclosed to Alexandra Q. Villanueva, a cosponsor of H.R. 1234.',
+      '$187.4K of the $452.0K disclosed to Alexandra Q. Villanueva — a cosponsor of H.R. 1234 — came from donors this tool classifies as Electric utilities.',
     );
   });
 
+  /**
+   * A sector is not a legal person and cannot contribute to anything. Worse,
+   * corporations are barred from contributing to federal candidates outright,
+   * so "Electric utilities gave $187.4K to <named member>" — painted into a
+   * shareable image — asserted a crime by two named parties. The money is the
+   * subject of the sentence now and the sector is a classification of the
+   * donors, which is what the data actually contains.
+   */
+  it('never makes a sector the giver', () => {
+    const givingVerb = /\b(?:sector|industry|utilities|finance|pharma|[A-Z][a-z]+)\s+(?:gave|gives|donated|contributed|funded|paid)\b/;
+    for (const f of [FINDING, { ...FINDING, totalDisclosed: null }, { ...FINDING, cycle: null }]) {
+      expect(buildHeadline(f)).not.toMatch(givingVerb);
+      expect(shareCardAlt(f)).not.toMatch(givingVerb);
+    }
+    expect(buildHeadline(FINDING)).toContain('came from donors this tool classifies as');
+  });
+
   it('carries the denominator, so the share is checkable from the image alone', () => {
-    // The council's finding: "gave $20K … 80%" invited the reader to work out a
+    // The council's finding: "$20K … 80%" invited the reader to work out a
     // total that appeared nowhere on the card.
     expect(buildHeadline(FINDING)).toContain('of the $452.0K disclosed to');
     // …and degrades to a shorter true sentence when the total is genuinely unknown.
     expect(buildHeadline({ ...FINDING, totalDisclosed: null })).toBe(
-      'Electric utilities gave $187.4K to Alexandra Q. Villanueva, a cosponsor of H.R. 1234.',
+      '$187.4K disclosed to Alexandra Q. Villanueva — a cosponsor of H.R. 1234 — came from donors this tool classifies as Electric utilities.',
     );
   });
 
@@ -230,7 +247,7 @@ describe('card copy', () => {
     expect(buildRoleClause('Cosponsor or committee member')).toBe('a cosponsor of, or on a committee handling,');
     // An unknown role falls back rather than guessing the worse-sounding option.
     expect(buildRoleClause(null)).toBe('listed on');
-    expect(buildHeadline({ ...FINDING, role: null })).toContain('listed on H.R. 1234');
+    expect(buildHeadline({ ...FINDING, role: null })).toContain('— listed on H.R. 1234 —');
   });
 
   it('states the denominator and the classification method under the score', () => {

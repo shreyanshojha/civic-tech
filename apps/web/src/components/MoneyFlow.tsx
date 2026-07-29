@@ -74,15 +74,24 @@ export function MoneyFlow({
 
   // One sentence carrying everything the picture carries, for anyone who does
   // not get the picture — screen reader, print, images-off, or in a hurry.
+  //
+  // "Banking & Finance gave $59 thousand" used to be the wording here and in
+  // the list below. A sector cannot give anything: these figures are PAC
+  // contributions plus individual contributions bucketed by the employer each
+  // donor typed on their own filing. Corporate contributions to federal
+  // candidates are illegal, so writing it that way asserted a crime in passing.
+  // The neutral construction states exactly what the data is.
   const spoken =
-    `Diagram. ${rows.map((r) => `${r.label} gave ${plainAmount(r.amount)}`).join('; ')}. ` +
-    `That money was disclosed to ${memberName}${cycle ? ` in the ${cycle} cycle` : ''}. ` +
+    `Diagram. ${rows
+      .map((r) => `${plainAmount(r.amount)} of the money disclosed to ${memberName} came from donors this tool classifies as ${r.label}`)
+      .join('; ')}. ` +
+    `That money was disclosed${cycle ? ` in the ${cycle} cycle` : ''}. ` +
     `${memberName} ${role ? `is listed as ${role.toLowerCase()} on` : 'worked on'} ${billLabel}. ` +
     'The line between the member and the bill is a role, not a payment.';
 
   return (
     <figure className="card-data p-3">
-      <figcaption className="label mb-2">Where the money came from, and what it is next to</figcaption>
+      <figcaption className="label mb-2">Where the money came from, and what it sits next to</figcaption>
 
       {/* Small on purpose, and capped: a diagram that grows to 900px wide
           stops being a glance and starts being a chart. `h-auto` keeps the
@@ -95,7 +104,7 @@ export function MoneyFlow({
         className="block h-auto w-full max-w-[24rem]"
         preserveAspectRatio="xMidYMid meet"
       >
-        <text x="4" y="12" className="fill-ink-3" fontSize="9">Sectors that gave</text>
+        <text x="4" y="12" className="fill-ink-3" fontSize="9">Donors classified as</text>
         <text x="120" y="12" className="fill-ink-3" fontSize="9">Member</text>
         <text x="188" y="12" className="fill-ink-3" fontSize="9">This bill</text>
 
@@ -144,15 +153,16 @@ export function MoneyFlow({
         {rows.map((r, i) => (
           <li key={r.industry} className="flex flex-wrap items-baseline gap-x-1.5">
             <span aria-hidden className="tnum text-xs text-ink-4">{i + 1}</span>
+            <span className="tnum">{plainAmount(r.amount)}</span>
+            <span>came from donors this tool classifies as</span>
             <Link className="link" to={`/industries/${r.industry}`}>{r.label}</Link>
-            <span className="tnum">gave {plainAmount(r.amount)}</span>
             <span className="text-xs text-ink-3">(that is {plainShare(r.share)})</span>
           </li>
         ))}
       </ol>
 
       <p className="mt-2.5 text-sm leading-relaxed text-ink-2">
-        That is {plainAmount(total)} in all — {plainShare(shareTotal)} — reported as given to{' '}
+        That is {plainAmount(total)} in all — {plainShare(shareTotal)} — of the money disclosed to{' '}
         {memberHref ? (
           <Link className="link font-medium" to={memberHref}>{memberName}</Link>
         ) : (
@@ -161,9 +171,14 @@ export function MoneyFlow({
         {cycle ? <> in the {cycle} cycle</> : null}. {memberName} is listed as{' '}
         {role ? role.toLowerCase() : 'involved'} on {billLabel}.
       </p>
-      <p className="mt-1.5 text-xs leading-snug text-ink-3">
+      <p className="mt-1.5 text-sm leading-snug text-ink-3">
         The dashed line is a job, not a payment. No money in this picture went to the bill, and none
         of it shows why anyone voted any way. Exact figures: {rows.map((r) => usd(r.amount)).join(' · ')}.
+      </p>
+      <p className="data-limit mt-2">
+        A sector name here is a label this tool put on a donor, not an entity that wrote a cheque.
+        Committee rows are real PACs; the rest is individual contributions grouped by the employer
+        each donor typed on their own filing.
       </p>
     </figure>
   );

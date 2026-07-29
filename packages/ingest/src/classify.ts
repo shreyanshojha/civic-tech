@@ -211,7 +211,7 @@ async function classifyBills(cfg: LlmConfig | null, limit: number): Promise<{ do
   let done = 0, cached = 0, failed = 0, ceremonial = 0;
 
   for (const [i, b] of bills.entries()) {
-    const cer = isCeremonialMeasure(b.title, b.bill_type, b.policy_area);
+    const cer = isCeremonialMeasure(b.title, b.bill_type, b.policy_area, JSON.parse(b.subjects || '[]') as string[]);
     const input = cer.ceremonial ? `CEREMONIAL:${b.title}` : billInputText(b);
     const h = hash(input);
     const prev = existing.get(b.id);

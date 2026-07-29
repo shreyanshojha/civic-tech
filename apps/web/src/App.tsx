@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { HashRouter, Link, NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import { PROJECT_NAME } from '@ftm/core';
+import { PROJECT_NAME, PROJECT_REPO_URL, PROJECT_REPO_URL_IS_PLACEHOLDER } from '@ftm/core';
 import { PersistentDisclaimer } from './components/Framing';
 import { GlobalSearch } from './components/GlobalSearch';
 import { Loading } from './components/ui';
@@ -27,12 +27,22 @@ const MethodologyPage = lazy(() => import('./pages/Methodology'));
 const LimitationsPage = lazy(() => import('./pages/Limitations'));
 const AboutPage = lazy(() => import('./pages/About'));
 
+/**
+ * `About` is in the primary nav, not only in the footer.
+ *
+ * A reader deciding whether to believe any of this looks for who made it before
+ * they look at a number, and a link buried in the footer of a long page is a
+ * link they never reach. A skeptical reviewer of this site stopped at exactly
+ * that point: no named human anywhere, and the page that would have said so was
+ * three screens down.
+ */
 const NAV = [
   { to: '/bills', label: 'Bills' },
   { to: '/reps', label: 'Representatives' },
   { to: '/industries', label: 'Sectors' },
   { to: '/spending', label: 'Federal spending' },
   { to: '/methodology', label: 'Method' },
+  { to: '/about', label: 'About' },
 ];
 
 /**
@@ -118,7 +128,7 @@ function Footer() {
       <div className="mx-auto max-w-content px-4 py-8 text-sm text-ink-3">
         <div className="grid gap-6 sm:grid-cols-3">
           <div>
-            <div className="label mb-1.5">This project</div>
+            <h3 className="label mb-1.5">This project</h3>
             <ul className="space-y-1">
               <li><Link className="link" to="/about">What this is</Link></li>
               <li><Link className="link" to="/methodology">How the numbers work</Link></li>
@@ -126,20 +136,49 @@ function Footer() {
             </ul>
           </div>
           <div>
-            <div className="label mb-1.5">Primary sources</div>
+            <h3 className="label mb-1.5">Primary sources</h3>
             <ul className="space-y-1">
               <li><a className="link" href="https://www.fec.gov/data/" target="_blank" rel="noreferrer">FEC campaign finance</a></li>
               <li><a className="link" href="https://www.congress.gov/" target="_blank" rel="noreferrer">Congress.gov</a></li>
               <li><a className="link" href="https://www.usaspending.gov/" target="_blank" rel="noreferrer">USASpending.gov</a></li>
             </ul>
           </div>
-          <div>
-            <div className="label mb-1.5">Open source</div>
-            <p className="leading-relaxed">
-              MIT licensed. A personal open-source project, not a company and not a commercial
-              product. Runs entirely on your own machine with your own API keys.
-            </p>
-          </div>
+          {/* A heading that says "Open source" over a block containing no link
+              to any source is worse than saying nothing: a reader looking for
+              the code finds a claim and no way to check it, and reasonably
+              concludes the claim is decoration. While no repository address is
+              set, this column says exactly that in plain words and drops the
+              heading that promises a link. */}
+          {PROJECT_REPO_URL_IS_PLACEHOLDER ? (
+            <div>
+              <h3 className="label mb-1.5">Licence and source</h3>
+              <p className="leading-relaxed">
+                MIT licensed. This is an unpublished build: no public source address has been set
+                for it yet, so there is no repository to link to from here. It is a personal
+                open-source project, not a company and not a commercial product, and it runs
+                entirely on your own machine with your own API keys.
+              </p>
+              <p className="mt-1.5 leading-relaxed">
+                <Link className="link" to="/about">Who maintains this, and how to report a problem</Link>
+              </p>
+            </div>
+          ) : (
+            <div>
+              <h3 className="label mb-1.5">Open source</h3>
+              <p className="leading-relaxed">
+                MIT licensed. A personal open-source project, not a company and not a commercial
+                product. Runs entirely on your own machine with your own API keys.
+              </p>
+              <p className="mt-1.5">
+                <a className="link" href={`https://${PROJECT_REPO_URL}`} target="_blank" rel="noreferrer noopener">
+                  {PROJECT_REPO_URL}
+                </a>
+              </p>
+              <p className="mt-1.5 leading-relaxed">
+                <Link className="link" to="/about">Who maintains this, and how to report a problem</Link>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </footer>
@@ -165,41 +204,168 @@ function NotFound() {
   );
 }
 
+/**
+ * Says out loud that the page changed.
+ *
+ * ---------------------------------------------------------------------------
+ * A route change in this app used to be completely silent. `document.title`
+ * was set once in index.html and never again, so every one of the eleven routes
+ * announced itself as the same string — in the tab, in the window switcher, in
+ * a bookmark, and in the browser history. And because the router swaps the
+ * contents of <main> without a document load, a screen reader was told nothing
+ * at all: focus stayed on the link that had just been activated, which by then
+ * pointed at a page that was no longer on screen.
+ *
+ * Three things happen on every navigation:
+ *   1. document.title becomes the subject of the page ("Robert B. Aderholt —
+ *      Follow the Money"), taken from the page's own h1 so it can never drift
+ *      from what is rendered;
+ *   2. focus moves to that h1, which is given tabindex="-1" so it can receive
+ *      focus without becoming a tab stop;
+ *   3. the same subject is announced through a visually-hidden role="status".
+ *
+ * The h1 usually is not in the DOM yet when the route changes — the page is a
+ * lazy chunk and most pages then wait on a JSON file — so this observes <main>
+ * until one appears rather than reading it once and giving up. Focus is moved
+ * only for a real navigation, never on first load, where stealing focus from
+ * the top of the document would be its own bug.
+ *
+ * The stale-h1 guard is not defensive coding, it is a bug this had. While a
+ * lazy route chunk is still downloading, React keeps the PREVIOUS page's
+ * markup on screen — so an effect that reads `main.querySelector('h1')` the
+ * moment the pathname changes reads the h1 of the page the reader just left,
+ * sets the tab title to it, and stops looking. Measured: every route announced
+ * the title of the route before it. So an h1 only counts once it is either a
+ * different DOM node or carries different text from the one already announced.
+ * ---------------------------------------------------------------------------
+ */
+function RouteAnnouncer({ mainRef }: { mainRef: React.RefObject<HTMLElement> }) {
+  const { pathname } = useLocation();
+  const [message, setMessage] = useState('');
+  const isFirstRoute = useRef(true);
+  /** The h1 the current title came from: both the node and its text. */
+  const announced = useRef<{ node: Element | null; subject: string }>({ node: null, subject: '' });
+
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    const shouldFocus = !isFirstRoute.current;
+    isFirstRoute.current = false;
+
+    const apply = (force: boolean): boolean => {
+      const h1 = main.querySelector('h1');
+      const subject = (h1?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      if (!h1 || !subject) return false;
+      // Still the h1 we announced last time, unchanged? Then the new page has
+      // not rendered yet and this is the outgoing page's heading.
+      const stale = h1 === announced.current.node && subject === announced.current.subject;
+      if (stale && !force) return false;
+
+      announced.current = { node: h1, subject };
+      document.title = `${subject} — ${PROJECT_NAME}`;
+      setMessage(`${subject}. ${PROJECT_NAME}.`);
+      if (shouldFocus) {
+        h1.setAttribute('tabindex', '-1');
+        h1.focus({ preventScroll: true });
+      }
+      return true;
+    };
+
+    if (apply(false)) return;
+
+    const observer = new MutationObserver(() => {
+      if (apply(false)) observer.disconnect();
+    });
+    observer.observe(main, { childList: true, subtree: true, characterData: true });
+    // A page that never produces its own h1 would otherwise leave the previous
+    // route's title in the tab, which is worse than a generic one.
+    const giveUp = window.setTimeout(() => {
+      observer.disconnect();
+      if (!apply(true)) document.title = PROJECT_NAME;
+    }, 8000);
+
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(giveUp);
+    };
+  }, [pathname, mainRef]);
+
+  return (
+    <p role="status" aria-live="polite" className="sr-only">
+      {message}
+    </p>
+  );
+}
+
+function Shell() {
+  const mainRef = useRef<HTMLElement>(null);
+
+  /**
+   * The skip link is a button, not an anchor, and that is a bug fix rather
+   * than a preference.
+   *
+   * Under HashRouter the whole route lives in `location.hash`. `<a href="#main">`
+   * therefore did not jump to an element — it REPLACED the route with `#main`,
+   * which matches nothing, so the router rendered "Page not found" and the page
+   * the reader was on disappeared. It is the first tab stop on every page, so
+   * the one control on this site built specifically for keyboard users was the
+   * fastest way for a keyboard user to destroy the page they were reading.
+   *
+   * Focusing <main> directly does the job an in-page anchor is supposed to do,
+   * and does not touch the URL at all. `tabindex="-1"` is set at the moment of
+   * use so that <main> is focusable programmatically without becoming a tab
+   * stop for everybody else.
+   */
+  const skipToMain = () => {
+    const main = mainRef.current;
+    if (!main) return;
+    main.setAttribute('tabindex', '-1');
+    main.focus();
+    main.scrollIntoView({ block: 'start' });
+  };
+
+  return (
+    <div className="flex min-h-dvh flex-col">
+      {/* Keyboard users should not have to tab through the whole nav on every
+          route change. */}
+      <button
+        type="button"
+        onClick={skipToMain}
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:border focus:border-edge focus:bg-paper-raised focus:px-3 focus:py-2 focus:text-sm"
+      >
+        Skip to main content
+      </button>
+      <RouteAnnouncer mainRef={mainRef} />
+      <Header />
+      <main id="main" ref={mainRef} className="flex-1 pb-[var(--disclaimer-space)]">
+        <Suspense fallback={<div className="mx-auto max-w-content px-4"><Loading what="page" /></div>}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/bills" element={<BillsPage />} />
+            <Route path="/bills/:id" element={<BillDetailPage />} />
+            <Route path="/reps" element={<RepsPage />} />
+            <Route path="/reps/:bioguideId" element={<RepDetailPage />} />
+            <Route path="/industries" element={<IndustriesPage />} />
+            <Route path="/industries/:id" element={<IndustryDetailPage />} />
+            <Route path="/spending" element={<SpendingPage />} />
+            <Route path="/methodology" element={<MethodologyPage />} />
+            <Route path="/limitations" element={<LimitationsPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      </main>
+      <Footer />
+      <PersistentDisclaimer />
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <HashRouter>
       <ScrollToTop />
-      <div className="flex min-h-dvh flex-col">
-        {/* Keyboard users should not have to tab through the whole nav on every
-            route change. */}
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:border focus:border-edge focus:bg-paper-raised focus:px-3 focus:py-2 focus:text-sm"
-        >
-          Skip to main content
-        </a>
-        <Header />
-        <main id="main" className="flex-1 pb-[var(--disclaimer-space)]">
-          <Suspense fallback={<div className="mx-auto max-w-content px-4"><Loading what="page" /></div>}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/bills" element={<BillsPage />} />
-              <Route path="/bills/:id" element={<BillDetailPage />} />
-              <Route path="/reps" element={<RepsPage />} />
-              <Route path="/reps/:bioguideId" element={<RepDetailPage />} />
-              <Route path="/industries" element={<IndustriesPage />} />
-              <Route path="/industries/:id" element={<IndustryDetailPage />} />
-              <Route path="/spending" element={<SpendingPage />} />
-              <Route path="/methodology" element={<MethodologyPage />} />
-              <Route path="/limitations" element={<LimitationsPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </main>
-        <Footer />
-        <PersistentDisclaimer />
-      </div>
+      <Shell />
     </HashRouter>
   );
 }
