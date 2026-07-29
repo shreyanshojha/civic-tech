@@ -172,6 +172,33 @@ export default function Home() {
               }
             />
           </div>
+
+          {/* ---- the fourth door ------------------------------------------
+              A reader told us plainly: "I am not able to learn anything or
+              derive any conclusion from it", and then "explain me how to read
+              it". The three doors above answer "where do I go"; none of them
+              answered "what am I looking at once I get there", and a reader who
+              cannot answer that leaves regardless of how good the data is.
+
+              So the guide is a door too, and it sits with the other three
+              rather than in the footer — the same <EntryCard/>, one row down so
+              the three original doors keep their grid. It is deliberately not
+              dressed up as a notice or a callout: a first-time visitor should be
+              able to pick it as easily as any other starting point. */}
+          <div className="mt-3">
+            <EntryCard
+              to="/how-to-read"
+              title="New here? Start with how to read this"
+              line="What the numbers mean, what a big number does not mean, and what you can fairly conclude."
+              icon={
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <circle cx="10" cy="10" r="7.2" />
+                  <path d="M8 7.8a2 2 0 1 1 2.6 1.9c-.4.15-.6.5-.6.95v.6" strokeLinecap="round" />
+                  <path d="M10 14.2v.1" strokeLinecap="round" />
+                </svg>
+              }
+            />
+          </div>
         </div>
         </div>
         {/* Last in the DOM, and last on a phone: a reader who has not chosen

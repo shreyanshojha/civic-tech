@@ -8,6 +8,7 @@
     "fec": "tsx src/fec.ts",
     "congress": "tsx src/congress.ts",
     "usaspending": "tsx src/usaspending.ts",
+    "districts": "tsx src/districts.ts",
     "classify": "tsx src/classify.ts",
     "export": "tsx src/export.ts",
     "sample": "tsx src/make-sample.ts",

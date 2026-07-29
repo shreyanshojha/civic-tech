@@ -108,8 +108,9 @@ individually:
 | 1 | `npm run ingest:fec` | FEC bulk downloads: candidates, committees, and every committee-to-candidate contribution for the cycle | none |
 | 2 | `npm run ingest:congress` | GovInfo bulk bill status + the public-domain congress-legislators datasets | none |
 | 3 | `npm run ingest:usaspending` | Federal contract and grant awards | none |
-| 4 | `npm run classify` | Assigns sectors to bills and donor organisations | none (better with one) |
-| 5 | `npm run export` | Builds the static JSON the apps read | none |
+| 4 | `npm run ingest:districts` | Census ZIP-to-district and town-to-district relationship files, so "who represents me?" is answered from a local file | none |
+| 5 | `npm run classify` | Assigns sectors to bills and donor organisations | none (better with one) |
+| 6 | `npm run export` | Builds the static JSON the apps read | none |
 
 Everything lands in `data/ftm.sqlite` (a local file) and
 `apps/web/public/data/` (static JSON). Every step is **idempotent** — re-run any of
@@ -165,11 +166,16 @@ and the UI says so.
 
 The API is open. Nothing to do.
 
-### 3. Census geocoder — no key needed
+### 3. Census district files — no key needed
 
-Used only when *you* type an address into the "find my representative" box. The site
-tells you on screen, before it runs, that the address goes to the US Census Bureau and
-nowhere else.
+Downloaded once, at build time, by `npm run ingest:districts`. "Who represents this ZIP
+code or town?" is then answered from that file on the reader's own device — the site
+makes no outbound request at all, so nothing anyone types can leave the machine.
+
+(This used to be an address box that called the Census geocoder from the browser. That
+service sends no `Access-Control-Allow-Origin` header, so a browser discards its answer
+on every origin: the feature could not work from a static site, and shipping the
+crosswalk replaced it rather than proxying readers' home addresses through a stranger.)
 
 ---
 
@@ -399,7 +405,7 @@ use commercially:
 | [Congress.gov API](https://api.congress.gov/) | Bills, votes | Free | US Government work, public domain |
 | [@unitedstates/congress-legislators](https://github.com/unitedstates/congress-legislators) | Member IDs, FEC crosswalk, committee rosters | No | CC0 / public domain |
 | [USASpending.gov API](https://api.usaspending.gov/) | Federal awards | No | US Government work, public domain |
-| [Census Geocoder](https://geocoding.geo.census.gov/) | Address → congressional district | No | US Government work, public domain |
+| [Census 2020 relationship files](https://www2.census.gov/geo/docs/maps-data/data/rel2020/cd-sld/) | ZIP code and town → congressional district, shipped with the app | No | US Government work, public domain |
 
 Member portraits come from the public-domain
 [@unitedstates images](https://github.com/unitedstates/images) collection.
@@ -417,9 +423,8 @@ built from raw disclosure text instead, and is correspondingly noisier — see
 - No analytics, no error reporting, no trackers.
 - Search runs entirely in your browser against a local file. No query leaves the
   device.
-- The only optional outbound request from the UI is the address lookup you explicitly
-  trigger, which goes to the US Census Bureau geocoder. The page says so before it
-  runs, and name search works without it.
+- The UI makes **no** outbound request. ZIP, town and name lookups all read files
+  already on your device, so no ZIP, town or name you type leaves it.
 - Your API keys live in `.env`, which is gitignored, and are sent only to the API each
   key belongs to. They are never logged and are scrubbed from error messages.
 

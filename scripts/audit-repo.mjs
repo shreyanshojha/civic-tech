@@ -113,11 +113,20 @@ const RULES = [
   },
 ];
 
-/** Outbound hosts a build or runtime may legitimately contact. */
+/**
+ * Outbound hosts a build or runtime may legitimately contact.
+ *
+ * `geocoding.geo.census.gov` used to be on this list, for the one runtime call
+ * the app made. It is off it now: the address box that called it is gone (the
+ * service sends no CORS header, so a browser could never read the answer), and a
+ * host left on an allow-list that nothing calls is how it quietly comes back.
+ * `www2.census.gov` replaces it — the district relationship files, fetched once
+ * at build time by the ingest step, never by the browser.
+ */
 const ALLOWED_HOSTS = [
   'api.open.fec.gov', 'www.fec.gov', 'api.congress.gov', 'www.congress.gov',
   'www.govinfo.gov', 'api.usaspending.gov', 'www.usaspending.gov',
-  'unitedstates.github.io', 'geocoding.geo.census.gov',
+  'unitedstates.github.io', 'www2.census.gov',
   'api.anthropic.com', 'api.openai.com',
   'clerk.house.gov', 'www.cbo.gov', 'api.data.gov',
   'localhost', '127.0.0.1', '0.0.0.0',

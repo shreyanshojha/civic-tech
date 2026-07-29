@@ -27,6 +27,7 @@ import {
   DISCLAIMER_MEDIUM,
   DISCLAIMER_PLAIN,
   DISCLAIMER_PLAIN_MORE,
+  NO_ACCUSATION,
   OVERLAP_BAND_LABEL,
   OVERLAP_BAND_NOTE,
   OVERLAP_BAND_PLAIN,
@@ -159,12 +160,28 @@ export function DataLimit({
   return <p className={`data-limit ${className}`}>{children}</p>;
 }
 
+/**
+ * The full statement: the four correlation paragraphs, then the separate claim
+ * that nobody is being accused of anything.
+ *
+ * NO_ACCUSATION is deliberately set apart rather than appended to the run of
+ * paragraphs above it. Four paragraphs of "this is not proof" train a reader to
+ * read the fifth as the same point restated a fourth time, and it is not the
+ * same point: those are statements about what the evidence can support, this one
+ * is a statement about what the publisher is alleging about a named person.
+ * A reader who skims this block and takes away only "not proof" has missed the
+ * answer to the question they actually had. Hence the rule above it, a step
+ * darker ink, and its own position at the end where it is the last thing read.
+ *
+ * Both strings still come from @ftm/core; nothing here writes its own wording.
+ */
 export function LongDisclaimer() {
   return (
     <div className="max-w-measure space-y-3 text-base leading-relaxed text-ink-2">
       {DISCLAIMER_LONG.split('\n\n').map((p, i) => (
         <p key={i}>{p}</p>
       ))}
+      <p className="border-t border-line pt-3 text-ink-1">{NO_ACCUSATION}</p>
     </div>
   );
 }

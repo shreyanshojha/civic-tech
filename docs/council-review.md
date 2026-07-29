@@ -23,8 +23,10 @@ Five reviewers, five sets of priorities. Consolidated severity table at the end.
   claim holds.
 - **`npm run audit:repo` passes and `npm test` passes (33 tests).** No telemetry, no
   payments, no accounts. Real.
-- **The geocoder disclosure on `/reps`** is a model of how to tell a user what leaves
-  their machine.
+- **`/reps` now sends nothing at all.** The address box that went to the Census geocoder
+  (which sends no CORS header, so it never worked from a browser) was replaced by a
+  ZIP-and-town crosswalk shipped with the app, and its privacy panel was deleted rather
+  than reworded.
 
 Everything below is what is wrong.
 

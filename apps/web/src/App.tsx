@@ -23,6 +23,7 @@ const RepDetailPage = lazy(() => import('./pages/RepDetail'));
 const IndustriesPage = lazy(() => import('./pages/Industries'));
 const IndustryDetailPage = lazy(() => import('./pages/IndustryDetail'));
 const SpendingPage = lazy(() => import('./pages/Spending'));
+const HowToReadPage = lazy(() => import('./pages/HowToRead'));
 const MethodologyPage = lazy(() => import('./pages/Methodology'));
 const LimitationsPage = lazy(() => import('./pages/Limitations'));
 const AboutPage = lazy(() => import('./pages/About'));
@@ -35,12 +36,20 @@ const AboutPage = lazy(() => import('./pages/About'));
  * link they never reach. A skeptical reviewer of this site stopped at exactly
  * that point: no named human anywhere, and the page that would have said so was
  * three screens down.
+ *
+ * `How to read this` sits directly before `Method`, and the two are next to each
+ * other on purpose: a reader who wants help is looking in that region of the
+ * nav, and the pair reads as "what the numbers mean / how they are computed".
+ * It is in the primary nav rather than the footer for the same reason `About`
+ * is — a reader who cannot tell what the site is for gives up long before they
+ * reach the bottom of a page, which is exactly the failure this page fixes.
  */
 const NAV = [
   { to: '/bills', label: 'Bills' },
   { to: '/reps', label: 'Representatives' },
   { to: '/industries', label: 'Sectors' },
   { to: '/spending', label: 'Federal spending' },
+  { to: '/how-to-read', label: 'How to read this' },
   { to: '/methodology', label: 'Method' },
   { to: '/about', label: 'About' },
 ];
@@ -131,6 +140,7 @@ function Footer() {
             <h3 className="label mb-1.5">This project</h3>
             <ul className="space-y-1">
               <li><Link className="link" to="/about">What this is</Link></li>
+              <li><Link className="link" to="/how-to-read">How to read this site</Link></li>
               <li><Link className="link" to="/methodology">How the numbers work</Link></li>
               <li><Link className="link" to="/limitations">What it cannot do</Link></li>
             </ul>
@@ -348,6 +358,7 @@ function Shell() {
             <Route path="/industries" element={<IndustriesPage />} />
             <Route path="/industries/:id" element={<IndustryDetailPage />} />
             <Route path="/spending" element={<SpendingPage />} />
+            <Route path="/how-to-read" element={<HowToReadPage />} />
             <Route path="/methodology" element={<MethodologyPage />} />
             <Route path="/limitations" element={<LimitationsPage />} />
             <Route path="/about" element={<AboutPage />} />

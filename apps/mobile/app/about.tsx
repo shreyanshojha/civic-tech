@@ -14,6 +14,7 @@ import { ScrollView, Text, View } from 'react-native';
 import {
   DISCLAIMER_MEDIUM,
   shortDate,
+  NO_ACCUSATION,
   OVERLAP_BAND_LABEL,
   OVERLAP_BAND_NOTE,
   PROJECT_NAME,
@@ -48,6 +49,20 @@ export default function About() {
         <Text style={{ marginTop: 8, fontSize: 14.5, lineHeight: 21, color: t.ink2 }}>
           {PROJECT_TAGLINE}
         </Text>
+
+        {/* First section on the screen, and not a restatement of the
+            correlation paragraph below it. "Not proof" is a claim about
+            evidence; this is the answer to the question a reader arrives with
+            after seeing their own representative named next to a dollar figure,
+            which is whether this app is accusing that person of something.
+            Left unanswered, readers answered it themselves and answered it
+            uncharitably. Same wording as the web /about because it comes from
+            @ftm/core, and the same neutral ink as every other paragraph here —
+            it is not a coverage caveat and must not borrow that styling. */}
+        <View style={{ marginTop: 26 }}>
+          <SectionTitle>This is not an accusation</SectionTitle>
+          <Text style={{ fontSize: 14.5, lineHeight: 22, color: t.ink1 }}>{NO_ACCUSATION}</Text>
+        </View>
 
         <View style={{ marginTop: 26 }}>
           <SectionTitle>The claim this tool makes</SectionTitle>

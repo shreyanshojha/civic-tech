@@ -3,8 +3,10 @@
  *
  * Everything is a static JSON file fetched from ./data/. There is no API, no
  * backend, no database connection, and no request that leaves the machine
- * serving this site — except the one optional address lookup the user
- * explicitly triggers (see geocode.ts, which says so on screen before it runs).
+ * serving this site — not one, since the address lookup that used to be the
+ * single exception was replaced by a shipped ZIP-and-town crosswalk (see
+ * district.ts: the Census geocoder sends no CORS header, so a browser could
+ * never read its answer anyway).
  *
  * Fetches are memoised so a given file is pulled once per page load.
  */

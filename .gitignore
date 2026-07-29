@@ -39,3 +39,6 @@ apps/mobile/assets/data/**/*.json
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Throwaway browser-check scripts
+_*.mjs

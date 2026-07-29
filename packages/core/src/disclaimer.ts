@@ -32,6 +32,38 @@ export const DISCLAIMER_LONG = [
   'Treat anything you find here as a question worth asking, never as an answer. If something looks significant, the next step is a journalist, a primary source, or a FOIA request — not a screenshot.',
 ].join('\n\n');
 
+/**
+ * ---------------------------------------------------------------------------
+ * THE CLAIM THIS PROJECT IS *NOT* MAKING ABOUT A PERSON
+ * ---------------------------------------------------------------------------
+ * This is a different sentence from the correlation framing above, and it is
+ * here as its own constant because it kept being mistaken for a restatement of
+ * it.
+ *
+ * "Correlation, not causation" is a statement about evidence: it says the data
+ * cannot support a causal claim. It does not answer the question a reader
+ * actually arrives at when a page has just named their own representative next
+ * to a dollar figure — is this site saying that person did something wrong.
+ * Nothing on the site ever said no, so readers supplied their own answer, and a
+ * page that puts money beside a vote looks like the opening paragraph of an
+ * accusation whatever the caveats around it say.
+ *
+ * So it is stated outright, in the publisher's voice, about the publisher's own
+ * claim. Note what it is careful NOT to do: it makes no finding that anybody is
+ * innocent either, because this tool cannot make findings about people in
+ * either direction. It says what is being alleged here, which is nothing.
+ * ---------------------------------------------------------------------------
+ */
+export const NO_ACCUSATION =
+  'This site is not an accusation. Nothing here claims that any member of Congress has broken a law, sold a vote, or done anything wrong, and nobody is being charged with anything. It places two public records side by side. Legislators routinely take money from industries in their district and legislate on those same industries, and that is ordinary, legal and expected. Any conclusion beyond what the records literally say is the reader\'s own to draw, and the dull explanation is usually the right one.';
+
+/**
+ * The one-line version, for a surface with no room for the paragraph. Shorter,
+ * never softer — both halves of the claim survive: no allegation is made, and
+ * none is implied either.
+ */
+export const NO_ACCUSATION_SHORT = 'Not an accusation. No wrongdoing by anyone is alleged or implied.';
+
 /** The line printed on every generated share card image. Must fit on one or two lines. */
 export const DISCLAIMER_CARD =
   'Correlation, not causation. Public records shown side by side — not proof of influence or wrongdoing.';
@@ -141,24 +173,32 @@ export const PROJECT_TAGLINE = 'Public money records and public legislative reco
 
 /**
  * ---------------------------------------------------------------------------
- * WHO PUBLISHED THIS BUILD
+ * WHERE A CORRECTION GOES, AND WHO PAID FOR THIS
  * ---------------------------------------------------------------------------
  * A reviewer who was otherwise ready to trust the site stopped at /about,
- * because no human was named anywhere in it and there was nowhere to report an
- * error. Anonymity plus a claim of openness reads as evasion whatever the
- * intent. These three values are what answers that, and they live here — next
- * to PROJECT_REPO_URL — so /about, the mobile app and any future surface all
- * state the same thing.
+ * because there was nowhere to report an error and nothing said whether anybody
+ * was paying for the thing. Those are the two questions that change how a
+ * reader should weigh what is in front of them: if a figure here is wrong, who
+ * do I tell — and does anyone have a stake in what this tool says. These values
+ * answer both, and they live here, next to PROJECT_REPO_URL, so /about, the
+ * mobile app and any future surface state the same thing.
+ *
+ * Neither question needs the publisher's name to answer it. What makes this
+ * checkable is that the method is public and the corrections route is real: the
+ * source is right there, so anybody can rerun the arithmetic and disagree with
+ * it regardless of who wrote it. Personal attribution is the publisher's own
+ * choice to make and this build does not make it — nothing downstream reads a
+ * maintainer name, so a fork that wants a byline adds one to its own /about
+ * rather than finding a stranger's name already sitting there.
  *
  * `PROJECT_CONTACT_URL` is deliberately an issue tracker rather than a personal
  * email address. It has to be somewhere a reader can actually reach and where
  * the reply is public, which an inbox is not; and a personal address painted
- * onto a civic-data site gets scraped. Anyone forking this must replace all
- * three, or the site credits work to someone who did not publish it.
+ * onto a civic-data site gets scraped. Anyone forking this must repoint it at
+ * their own tracker, or error reports about their copy arrive somewhere that
+ * cannot fix them.
  * ---------------------------------------------------------------------------
  */
-export const PROJECT_MAINTAINER = 'Shreyansh Ojha';
-
 export const PROJECT_CONTACT_LABEL = 'Open an issue on the repository';
 export const PROJECT_CONTACT_URL = 'https://github.com/shreyanshojha/civic-tech/issues';
 

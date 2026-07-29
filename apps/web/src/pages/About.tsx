@@ -20,10 +20,10 @@
 
 import { Link } from 'react-router-dom';
 import {
+  NO_ACCUSATION,
   PROJECT_CONTACT_LABEL,
   PROJECT_CONTACT_URL,
   PROJECT_FUNDING,
-  PROJECT_MAINTAINER,
   PROJECT_NAME,
   PROJECT_REPO_URL,
   PROJECT_REPO_URL_IS_PLACEHOLDER,
@@ -41,32 +41,68 @@ export default function About() {
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
       <h1 className="text-xl font-semibold text-ink-0">About {PROJECT_NAME}</h1>
       <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">{PROJECT_TAGLINE}</p>
-      {/* No framing note at the top of this page: the full statement is a
-          section of the page itself, further down, in its own words. Repeating
-          a shorter version of it above would be the third copy on one screen. */}
+      {/* No <FramingNote/> at the top of this page: the full correlation
+          statement is a section of the page itself, further down, in its own
+          words. Repeating a shorter version of it above would be the third copy
+          on one screen. The section immediately below is a different claim, not
+          a shorter copy of that one — see the note on it. */}
 
-      {/* ---- who made it ---------------------------------------------------
+      {/* ---- not an accusation ---------------------------------------------
+          ---------------------------------------------------------------------
+          This is the highest thing on the page on purpose, and it is not a
+          second copy of the correlation framing further down.
+
+          The correlation language answers a question about evidence. The
+          question a reader actually arrives with — having just seen their own
+          representative named next to a dollar figure — is whether this site is
+          accusing that person of something. Nothing here ever said no, so
+          readers answered it themselves, and the answer they reached was the
+          uncharitable one. If it is not being alleged, it costs one paragraph
+          to say so before anything else on the page.
+
+          Wording comes from @ftm/core (NO_ACCUSATION) like every other framing
+          string, so the mobile app makes the identical claim and no view can
+          soften this one alone. Rendered as ordinary lead prose, NOT amber:
+          principle 1 of styles.css reserves amber for "the data has a gap", and
+          this is not a gap in the data.
+          --------------------------------------------------------------------- */}
+      <section className="mt-7">
+        <SectionTitle>This is not an accusation</SectionTitle>
+        <p className="max-w-measure-wide text-md leading-relaxed text-ink-1">{NO_ACCUSATION}</p>
+      </section>
+
+      {/* ---- who to contact, and who paid for it ----------------------------
           ---------------------------------------------------------------------
           A reviewer who was otherwise ready to trust this site stopped here:
-          no human is named anywhere in it, the footer had a heading reading
-          "OPEN SOURCE" over a block containing no link, and there was nowhere
-          to report an error. Anonymity plus an unverifiable claim of openness
-          reads as evasion whatever the intent, and it is the cheapest possible
-          thing to fix.
+          the footer had a heading reading "OPEN SOURCE" over a block containing
+          no link, there was nowhere to report an error, and nothing said whether
+          anybody was funding the thing. Those two gaps are what made a claim of
+          openness unverifiable, and they are the cheapest possible things to fix.
+
+          What answers them is a working corrections route and a plain statement
+          about money — not a name. A name would not let anyone check a single
+          figure on this site; the published source does that, and it does it for
+          a reader who has never heard of whoever wrote it. So this section names
+          nobody, and it does not hedge about that either: it says what is true,
+          which is that the work is unfunded, personal, and inspectable line by
+          line by anyone who disagrees with it.
 
           The values come from @ftm/core, not from this file, so the mobile app
           and any future surface answer identically. This block is plain — not
           amber. Under principle 1 of styles.css the amber caveat colour means
-          "the data has a gap"; who publishes a build is not a data gap, and
-          colouring a person's name as a warning would be its own mistake.
+          "the data has a gap", and who published a build is not a data gap.
           --------------------------------------------------------------------- */}
       <section className="mt-8">
-        <SectionTitle>Who is behind this, and who paid for it</SectionTitle>
+        <SectionTitle>Who to contact, and who paid for it</SectionTitle>
+        <p className="mb-3 max-w-measure text-base leading-relaxed text-ink-2">
+          Nobody is named on this site, and nothing about reading it depends on a name: the whole
+          method is published, so any figure on any page can be recomputed — and argued with — by
+          somebody who has never heard of whoever wrote it. The two things that do change how this
+          should be read are where a correction goes and whose money is behind it. Both are stated
+          plainly below, and the short version of each is that corrections go to the issue tracker
+          and nobody is funding this.
+        </p>
         <dl className="max-w-measure-wide space-y-2.5 text-base leading-relaxed text-ink-2">
-          <div>
-            <dt className="label">Maintainer</dt>
-            <dd className="text-ink-1">{PROJECT_MAINTAINER}</dd>
-          </div>
           <div>
             <dt className="label">Contact</dt>
             <dd>
