@@ -107,23 +107,22 @@ All four must pass — **with one deliberate exception**: `npm run audit:repo`
 fails on `repo-url` until `PROJECT_REPO_URL` is set (see below). Every other
 check in it must be green, and your change must not add a second failure.
 
-### Before publishing a build: set `PROJECT_REPO_URL`
+### If you publish a fork: set `PROJECT_REPO_URL`
 
-`PROJECT_REPO_URL` in `packages/core/src/disclaimer.ts` is a placeholder. It is
-painted into every share-card PNG, and it is the only way a card recipient can
-get back to the method and the caveats — so shipping a value that resolves to
-nothing means shipping images with dead attribution.
+`PROJECT_REPO_URL` in `packages/core/src/disclaimer.ts` is painted into every
+share-card PNG, and it is the only way a card recipient can get back to the
+method and the caveats. In this repository it is
+`github.com/shreyanshojha/civic-tech`. Change it in a published fork, or your
+cards will point readers at this repository instead of yours.
 
-While it is unset:
+If it is left unset — empty, or containing `OWNER` or `example.com`:
 
 - `node scripts/audit-repo.mjs` fails with `FAIL repo-url` and exits non-zero;
 - the share-card dialog shows an amber warning saying it must be set;
 - `/about` says there is no source URL instead of rendering a dead link;
 - the card watermark reads `unpublished build — PROJECT_REPO_URL not set`.
 
-To publish, replace it with your host and path (no scheme,
-e.g. `github.com/yourname/follow-the-money`). Everything above switches off on
-its own — there is no second place to update.
+There is one place to update; everything above follows from it.
 
 ### Testing the LLM path without a key
 

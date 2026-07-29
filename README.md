@@ -256,31 +256,26 @@ Netlify, Cloudflare Pages, Vercel, S3, a Raspberry Pi, a USB stick. Build comman
 `npm run build`, publish directory `apps/web/dist`. All have free tiers; none of them
 require you to operate anything.
 
-### Before you publish: set `PROJECT_REPO_URL`
+### If you fork this: set `PROJECT_REPO_URL`
 
-`npm run audit:repo` **fails on a fresh clone**, on purpose, with:
+`PROJECT_REPO_URL` in `packages/core/src/disclaimer.ts` is painted into every
+share-card PNG this app generates, and it is the only path a card recipient has
+back to the method and the caveats. In this repository it is set to
+`github.com/shreyanshojha/civic-tech`.
 
-```
-FAIL  repo-url   the share-card watermark points at a real repository
-      PROJECT_REPO_URL is still a placeholder: "unpublished build — PROJECT_REPO_URL not set"
-```
-
-That is not a broken checkout. `PROJECT_REPO_URL` in
-`packages/core/src/disclaimer.ts` is painted into every share-card PNG this app
-generates, and it is the only path a card recipient has back to the method and
-the caveats. It used to ship as `github.com/OWNER/follow-the-money`, which looks
-like real attribution and resolves to nothing, so every image ever produced
-carried a dead link.
-
-Set it to your own host and path — no scheme:
+If you fork and publish your own copy, change it, or your cards will send
+readers to someone else's repository:
 
 ```ts
-export const PROJECT_REPO_URL: string = 'github.com/yourname/follow-the-money';
+export const PROJECT_REPO_URL: string = 'github.com/yourname/your-fork';
 ```
 
-Nothing else needs changing. `PROJECT_REPO_URL_IS_PLACEHOLDER`, the amber
-warning in the share-card dialog, the suppressed link on `/about` and the audit
-check all switch off by themselves once the value is real.
+It used to ship as `github.com/OWNER/follow-the-money`, which looks like real
+attribution and resolves to nothing, so every image produced carried a dead
+link. `PROJECT_REPO_URL_IS_PLACEHOLDER` now guards against that: leave the value
+empty, or containing `OWNER` or `example.com`, and `npm run audit:repo` fails
+with `FAIL repo-url`, the share-card dialog shows an amber warning, and `/about`
+suppresses the link rather than rendering a dead one.
 
 ### What you are *not* signing up for
 

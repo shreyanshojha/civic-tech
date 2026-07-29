@@ -117,7 +117,7 @@ export const OVERLAP_BAND_NOTE: Record<OverlapBand, string> = {
  */
 export const PROJECT_REPO_URL_PLACEHOLDER = 'unpublished build — PROJECT_REPO_URL not set';
 
-export const PROJECT_REPO_URL: string = PROJECT_REPO_URL_PLACEHOLDER;
+export const PROJECT_REPO_URL: string = 'github.com/shreyanshojha/civic-tech';
 
 /**
  * True while PROJECT_REPO_URL is not a real, resolvable repository path.
