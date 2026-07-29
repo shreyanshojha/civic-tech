@@ -90,8 +90,8 @@ required for a first run** — the pipeline defaults to bulk data sources that n
 signup at all.
 
 ```bash
-git clone <this repository>   # see "Before you publish" below — this repo has no
-cd follow-the-money           # published URL yet, and does not pretend to
+git clone https://github.com/shreyanshojha/civic-tech
+cd civic-tech
 npm install
 
 cp .env.example .env        # you can leave every key blank for now
@@ -352,7 +352,7 @@ screen, so the reader can discount accordingly.
 ## Project layout
 
 ```
-follow-the-money/
+civic-tech/
 ├─ packages/core/         shared types, sector taxonomy, overlap maths,
 │                         and the single source of truth for all framing language
 ├─ packages/ingest/       fetch → normalize → SQLite; the BYOK classification layer;
