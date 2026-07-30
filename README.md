@@ -89,16 +89,35 @@ You need [Node.js 20 or newer](https://nodejs.org). Nothing else. **No API key i
 required for a first run** — the pipeline defaults to bulk data sources that need no
 signup at all.
 
+**Just want to look at it?** The dataset is committed, so you do not need to build
+anything:
+
 ```bash
 git clone https://github.com/shreyanshojha/civic-tech
 cd civic-tech
-npm install
-
-cp .env.example .env        # you can leave every key blank for now
-
-npm run pipeline            # downloads and builds the dataset (5-15 minutes)
+npm run setup:web           # ~20 seconds
 npm run dev                 # opens the site at http://localhost:5173
 ```
+
+`setup:web` installs only what the site needs. Use it rather than a plain
+`npm install` unless you intend to run the pipeline — see the note below on why.
+
+**Want to rebuild or extend the data?** That needs the ingestion scripts, which
+need a SQLite driver that has to be compiled:
+
+```bash
+npm install                 # needs Node 20, 22 or 24 — see below
+cp .env.example .env        # you can leave every key blank
+npm run pipeline            # rebuilds the dataset (5-15 minutes)
+```
+
+> **Node 26 does not work for the pipeline.** `better-sqlite3` is a native addon
+> with no Node 26 binary, and its source no longer compiles because V8 removed
+> `Object::GetPrototype`. It is declared as an *optional* dependency precisely so
+> that this failure cannot stop you installing the site — npm otherwise aborts the
+> whole install, and the symptom you see is the deeply unhelpful
+> `vite: command not found`. If you need the pipeline, use
+> `nvm install 22 && nvm use 22`.
 
 That is the whole setup. `npm run pipeline` runs four steps you can also run
 individually:

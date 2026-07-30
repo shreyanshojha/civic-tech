@@ -15,8 +15,56 @@ import { DB_PATH } from './env.js';
 
 let _db: Database.Database | null = null;
 
+/**
+ * ---------------------------------------------------------------------------
+ * WHY better-sqlite3 IS AN *OPTIONAL* DEPENDENCY
+ *
+ * It is a native C++ addon, so npm has to either find a prebuilt binary for
+ * your exact Node version or compile it. On Node 26 neither worked: there was
+ * no prebuild, and the source does not compile because V8 removed
+ * `Object::GetPrototype` and `PropertyCallbackInfo::This`.
+ *
+ * That alone was survivable. What made it bad is that npm aborts the WHOLE
+ * install when a hard dependency fails to build — so somebody who just wanted
+ * to look at the site got no vite, no React, nothing, and an error about
+ * `node-gyp` and a C++ compiler that has no visible connection to what they
+ * asked for. The reported symptom was "vite: command not found", which points
+ * at entirely the wrong thing.
+ *
+ * Nothing in the web or mobile app touches SQLite. It is used only by the
+ * ingestion scripts, which most readers never run — the dataset ships in the
+ * repository. So it is optional: a failed build now leaves the site perfectly
+ * installable, and only the pipeline is affected. This function is where that
+ * shows up, so this is where the failure has to be explained in words rather
+ * than as a module-resolution stack trace.
+ * ---------------------------------------------------------------------------
+ */
+function assertDriverPresent(): void {
+  if (typeof Database === 'function') return;
+  throw new Error(
+    [
+      'The SQLite driver (better-sqlite3) is not installed, so the ingestion',
+      'scripts cannot run. The web and mobile apps do not need it — if you only',
+      'want to look at the site, run:',
+      '',
+      '    npm run setup:web',
+      '    npm run dev',
+      '',
+      'To run the pipeline you need it built, which needs a Node version it has a',
+      'binary for. Node 20, 22 or 24 all work; Node 26 does not, because V8',
+      'removed APIs the addon uses. With nvm:',
+      '',
+      '    nvm install 22 && nvm use 22 && npm install',
+      '',
+      'The dataset is committed to this repository, so you do not need the',
+      'pipeline unless you want to refresh or extend the data.',
+    ].join('\n'),
+  );
+}
+
 export function db(): Database.Database {
   if (_db) return _db;
+  assertDriverPresent();
   const d = new Database(DB_PATH);
   d.pragma('journal_mode = WAL');
   d.pragma('synchronous = NORMAL');

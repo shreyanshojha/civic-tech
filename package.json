@@ -19,6 +19,7 @@
     "ingest:districts": "npm run districts -w @ftm/ingest",
     "ingest:patterns": "npm run patterns -w @ftm/ingest",
     "pipeline": "npm run ingest:fec && npm run ingest:congress && npm run ingest:usaspending && npm run ingest:districts && npm run classify && npm run ingest:patterns && npm run export",
+    "setup:web": "npm install -w @ftm/web --include-workspace-root",
     "dev": "npm run dev -w @ftm/web",
     "build": "npm run build:core && npm run build -w @ftm/web",
     "preview": "npm run preview -w @ftm/web",
