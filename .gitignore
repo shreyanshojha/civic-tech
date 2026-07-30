@@ -10,6 +10,11 @@ build/
 # Local data artifacts — regenerate with `npm run pipeline`
 data/*.sqlite
 data/*.sqlite-journal
+# WAL mode is on (see lib/db.ts), so these two sidecar files exist after every
+# run. They were untracked-but-not-ignored, which means one `git add -A` at the
+# wrong moment would have committed a chunk of the database's write-ahead log.
+data/*.sqlite-shm
+data/*.sqlite-wal
 data/cache/
 
 # apps/web/public/data is deliberately NOT ignored.
