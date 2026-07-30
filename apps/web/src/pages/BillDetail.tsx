@@ -179,7 +179,22 @@ export default function BillDetail() {
                 legal title is already printed in the fold below. Showing it
                 twice, once under a heading promising plain English, is the
                 register laundering this page was rebuilt to stop. */}
-            {classification?.method === 'llm' && summaryParas.length > 0 && (
+            {/* The `crs-summary` condition is load-bearing, not belt-and-braces.
+                The caption below states the paraphrase was made "from the
+                official summary". For the 1,012 bills in this dataset that have
+                no official summary, a model has nothing to work from but the
+                title — so it would produce a fluent rephrasing of a title, this
+                block would present it under a heading promising a summary of the
+                bill, and the caption would assert a provenance that does not
+                exist. Three falsehoods stacked, all of them convincing.
+
+                Gating on the tier means the model's output is shown only where
+                there was source text for it to rewrite. Where there was not, the
+                "In plain words" block above already says so, which is the true
+                answer. */}
+            {classification?.method === 'llm'
+              && plain?.confidence === 'crs-summary'
+              && summaryParas.length > 0 && (
               <Fold className="mt-4" open={!isQuick} title="A language model's summary of this bill">
                 {summaryParas.map((p, i) => (
                   <p key={i} className="max-w-measure text-base leading-relaxed text-ink-2">{p}</p>
