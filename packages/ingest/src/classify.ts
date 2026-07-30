@@ -189,11 +189,42 @@ function ceremonialResult(b: BillRow, reason: string): LlmBillResult {
   };
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * FTM_CLASSIFY_ONLY_WITH_SUMMARY — spend the model where it has something to read
+ * ---------------------------------------------------------------------------
+ * Only 466 of 1,478 bills in this dataset have a summary written by the
+ * Congressional Research Service. The other 1,012 have a title and nothing else.
+ *
+ * Running the model on those 1,012 is not just poor value for money — it is the
+ * wrong thing to do. With only a title to work from, the model cannot describe
+ * what a bill does; it can only rephrase the title more fluently, and a fluent
+ * rephrasing reads to a reader exactly like a summary. That is precisely what
+ * core/plain-bill.ts refuses to do by design (see its rule 4: when only a title
+ * exists, say so and tell the reader to open the bill). Paying a model to
+ * manufacture the confident-sounding text that layer deliberately withholds
+ * would undo the honesty on purpose.
+ *
+ * So this flag restricts the LLM pass to bills with source text. The rest keep
+ * their metadata-derived sector tags and their honest "no summary exists" state.
+ *
+ * Set it to 1 and the run costs roughly a third as much and produces a strictly
+ * better result. It is off by default only because a fork with a different data
+ * mix might reasonably want everything.
+ * ---------------------------------------------------------------------------
+ */
 async function classifyBills(cfg: LlmConfig | null, limit: number): Promise<{ done: number; cached: number; failed: number; ceremonial: number }> {
+  const onlyWithSummary = process.env.FTM_CLASSIFY_ONLY_WITH_SUMMARY === '1';
+  if (onlyWithSummary) {
+    console.log('  FTM_CLASSIFY_ONLY_WITH_SUMMARY=1 — only bills with a CRS summary go to the model.');
+    console.log('  Bills with just a title keep their metadata tags and say plainly that no summary exists.');
+  }
   const bills = db().prepare(`
     SELECT id, title, policy_area, subjects, official_summary, bill_type, bill_number, congress
-    FROM bills ORDER BY latest_action_date DESC NULLS LAST LIMIT ?
-  `).all(limit) as BillRow[];
+    FROM bills
+    WHERE (? = 0 OR (official_summary IS NOT NULL AND length(official_summary) > 50))
+    ORDER BY latest_action_date DESC NULLS LAST LIMIT ?
+  `).all(onlyWithSummary ? 1 : 0, limit) as BillRow[];
 
   const existing = new Map(
     (db().prepare('SELECT bill_id, input_hash, method FROM bill_classifications').all() as
