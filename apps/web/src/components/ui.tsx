@@ -10,7 +10,6 @@
  */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { INDUSTRY_BY_ID, classificationMethodLabel, usd } from '@ftm/core';
 import type { IndustryId } from '@ftm/core';
 
@@ -53,6 +52,17 @@ export function PartyTag({ party }: { party?: string }) {
   );
 }
 
+/**
+ * A sector label, with its one-line definition on `title`.
+ *
+ * It used to be a link to a per-sector page. Those pages are gone: they were
+ * built from `legislators.json → donorSummary.top`, which carries only each
+ * member's three largest donor sectors, so a "top members for this sector" list
+ * rested on roughly an eighth of the money and could not be fixed from that
+ * file. A chip that leads nowhere is better than a chip that leads to a ranking
+ * built on a fraction of the data. The `onClick` form is still a real control —
+ * it filters the list the chip sits on.
+ */
 export function IndustryChip({
   id, active = false, onClick, count,
 }: { id: IndustryId; active?: boolean; onClick?: () => void; count?: number }) {
@@ -71,20 +81,24 @@ export function IndustryChip({
     );
   }
   return (
-    <Link to={`/industries/${id}`} className={`chip ${active ? 'chip-active' : ''}`} title={meta?.blurb}>
+    <span className={`chip ${active ? 'chip-active' : ''}`} title={meta?.blurb}>
       {body}
-    </Link>
+    </span>
   );
 }
 
-/** Horizontal bar list of industry amounts. One hue, magnitude by length. */
+/**
+ * Horizontal bar list of industry amounts. One hue, magnitude by length.
+ *
+ * The labels are plain text. They used to link to a per-sector page; see
+ * <IndustryChip/> above for why there is no longer one to link to.
+ */
 export function IndustryBars({
-  rows, max, showAmounts = true, linkTo = true,
+  rows, max, showAmounts = true,
 }: {
   rows: { industry: IndustryId; amount: number; share: number }[];
   max?: number;
   showAmounts?: boolean;
-  linkTo?: boolean;
 }) {
   const top = max ?? Math.max(...rows.map((r) => r.amount), 1);
   if (rows.length === 0) {
@@ -98,14 +112,8 @@ export function IndustryBars({
         return (
           <li key={r.industry}>
             <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="truncate text-ink-2">
-                {linkTo ? (
-                  <Link className="tap-24 hover:text-accent" to={`/industries/${r.industry}`} title={meta?.blurb}>
-                    {label}
-                  </Link>
-                ) : (
-                  label
-                )}
+              <span className="truncate text-ink-2" title={meta?.blurb}>
+                {label}
               </span>
               {showAmounts && (
                 <span className="tnum shrink-0 text-ink-3">

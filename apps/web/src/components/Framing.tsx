@@ -14,9 +14,26 @@
  * "dismiss" button: the whole product thesis is that this framing travels with
  * the data, and a dismissable banner is a banner that gets dismissed.
  *
- * `<ScoreExplainer/>` must be rendered anywhere an overlap number appears. The
- * `<OverlapScore/>` component below composes it in automatically so a developer
- * cannot render a bare number by accident.
+ * ---------------------------------------------------------------------------
+ * WHAT USED TO BE HERE: `<OverlapScore/>`, `<ScoreExplainer/>`, `bandNoteFor()`
+ * and `distinctBands()`. DO NOT PUT THEM BACK.
+ *
+ * They rendered the member×bill overlap score — the percentage of a member's
+ * reported money that came from sectors a bill would affect. Three independent
+ * evaluations of the site (a product manager, an ordinary voter, a working
+ * reporter) reached the same verdict independently: the score was the product's
+ * headline number and it was worthless. The site's own /how-to-read page said as
+ * much — "a big match says 'this page may be worth ten minutes'. It says nothing
+ * else. It is a bookmark, not a finding." Several pages existed only to display
+ * it, and they are gone with it.
+ *
+ * The score is still computed by the pipeline and still ships in the data
+ * bundle; nothing renders it. The comparison that survived is the committee
+ * cohort test on /patterns, which has a sample size and a stated denominator.
+ *
+ * The band strings and the score explainer still live in @ftm/core because the
+ * ingest pipeline and the core tests use them. Importing them back into a view
+ * is how this comes back by accident.
  * ---------------------------------------------------------------------------
  */
 
@@ -28,13 +45,6 @@ import {
   DISCLAIMER_PLAIN,
   DISCLAIMER_PLAIN_MORE,
   NO_ACCUSATION,
-  OVERLAP_BAND_LABEL,
-  OVERLAP_BAND_NOTE,
-  OVERLAP_BAND_PLAIN,
-  OVERLAP_BAND_PLAIN_NOTE,
-  SCORE_EXPLAINER,
-  SCORE_EXPLAINER_PLAIN,
-  overlapBand,
 } from '@ftm/core';
 
 /**
@@ -174,6 +184,24 @@ export function DataLimit({
  * darker ink, and its own position at the end where it is the last thing read.
  *
  * Both strings still come from @ftm/core; nothing here writes its own wording.
+ *
+ * ---------------------------------------------------------------------------
+ * THE ONE THING THIS COMPONENT ADDS TO THE CORE TEXT, AND WHY.
+ *
+ * One paragraph of DISCLAIMER_LONG explains what "a high overlap score" means.
+ * That score used to be printed on every member and bill page. It is not printed
+ * anywhere any more — it was cut after three independent evaluations found it was
+ * the headline metric and was worthless. The paragraph is still correct about the
+ * phenomenon, but a reader who goes looking for the number it names will not find
+ * one, and an unexplained reference to a missing feature reads as a site that has
+ * lost track of itself.
+ *
+ * The core string is NOT edited: it is the single source of the framing, it is
+ * asserted by a test and by the repo audit, and the ingest pipeline uses it. So
+ * the note below is the app's own editorial line, plainly marked as such, in the
+ * quiet tier, after the statement rather than inside it. Do not fold it, and do
+ * not fix this by rewording @ftm/core.
+ * ---------------------------------------------------------------------------
  */
 export function LongDisclaimer() {
   return (
@@ -182,171 +210,15 @@ export function LongDisclaimer() {
         <p key={i}>{p}</p>
       ))}
       <p className="border-t border-line pt-3 text-ink-1">{NO_ACCUSATION}</p>
+      <p className="text-sm text-ink-3">
+        One note on the wording above: this site no longer shows an overlap score — a single
+        percentage for how much of one member's money came from industries one bill would affect. It
+        was removed from every page, because a big number turned out to mean only “this page may be
+        worth ten minutes”. The paragraph naming it is kept as written because it is the same
+        statement every part of this project uses.
+      </p>
     </div>
   );
-}
-
-/**
- * How to read the number.
- *
- * Two levels, and the plain one is the default. `plain` swaps the three long
- * sentences for the three short ones from disclaimer.ts and keeps the long ones
- * one tap further in — folded, never dropped. Both sets say the same three
- * things: what it is, what it is not, what to do with it.
- */
-export function ScoreExplainer({
-  open: initial = false,
-  plain = false,
-}: {
-  open?: boolean;
-  plain?: boolean;
-}) {
-  const [open, setOpen] = useState(initial);
-  const [long, setLong] = useState(false);
-  const copy = plain && !long ? SCORE_EXPLAINER_PLAIN : SCORE_EXPLAINER;
-  return (
-    <div className="mt-2">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="tap-24 inline-flex items-center gap-1 text-xs font-medium text-ink-3 underline decoration-ink-5 underline-offset-2 hover:text-accent"
-        aria-expanded={open}
-      >
-        <svg
-          width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden
-          className={open ? 'rotate-90 transition-transform' : 'transition-transform'}
-        >
-          <path d="m3 1 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        {open ? 'Hide' : 'What does this number mean?'}
-      </button>
-      {open && (
-        <div className="mt-2 rounded border border-line border-l-2 border-l-accent-line bg-paper p-3">
-          <dl className="space-y-2 text-sm leading-relaxed text-ink-2">
-            <div>
-              <dt className="label">What it is</dt>
-              <dd>{copy.what}</dd>
-            </div>
-            <div>
-              <dt className="label">What it is not</dt>
-              <dd>{copy.whatItIsNot}</dd>
-            </div>
-            <div>
-              <dt className="label">How to use it</dt>
-              <dd>{copy.howToUse}</dd>
-            </div>
-          </dl>
-          {plain && (
-            <button
-              type="button"
-              onClick={() => setLong((l) => !l)}
-              aria-expanded={long}
-              className="tap-24 mt-2 text-xs font-medium text-ink-3 underline decoration-ink-5 underline-offset-2 hover:text-accent"
-            >
-              {long ? 'Show the short version' : 'Show the longer version'}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * The only sanctioned way to render an overlap score.
- *
- * It always renders the band label and the explainer alongside the number, so
- * a score can never appear on screen stripped of its meaning. The bar uses the
- * neutral ink ramp — never a red/green scale, which would imply a verdict.
- */
-export function OverlapScore({
-  score,
-  size = 'md',
-  showExplainer = true,
-  showBandNote = true,
-  plain = false,
-}: {
-  score: number;
-  size?: 'sm' | 'md' | 'lg';
-  showExplainer?: boolean;
-  /**
-   * Suppress the one-line band note under the bar.
-   *
-   * ONLY legal in a LIST, and only when the list states the same sentence once
-   * above it — see `bandNoteFor()` below, which is the sanctioned way to build
-   * that statement so the wording still comes from @ftm/core.
-   *
-   * The reason: a member page showing six bills printed "Few or none of this
-   * member's top disclosed donor industries have an obvious stake in this bill"
-   * six times, identically. Six copies of a caveat is not six times the care;
-   * testing found it is how a reader learns to skip the caveat, and how a
-   * distrustful reader reads volume as motive. The band LABEL still travels
-   * with every number, and the accessible name of every bar still carries the
-   * formal band, so nothing is stripped from an individual score.
-   */
-  showBandNote?: boolean;
-  /** Quick view: the plain band name and the plain one-line note, same bands. */
-  plain?: boolean;
-}) {
-  const band = overlapBand(score);
-  const pct = Math.round(score * 100);
-  const rampClass = { minimal: 'ramp-0', some: 'ramp-1', substantial: 'ramp-2', high: 'ramp-3' }[band];
-  const numberSize = { sm: 'text-lg', md: 'text-xl', lg: 'text-2xl' }[size];
-  // Plain view changes the words, never the bands and never the number. The
-  // formal label still travels with the score in the accessible name below.
-  const bandLabel = plain ? OVERLAP_BAND_PLAIN[band] : OVERLAP_BAND_LABEL[band];
-  const bandNote = plain ? OVERLAP_BAND_PLAIN_NOTE[band] : OVERLAP_BAND_NOTE[band];
-
-  return (
-    <div>
-      <div className="flex flex-wrap items-baseline gap-x-2">
-        <span className={`${numberSize} tnum font-semibold text-ink-0`}>{pct}%</span>
-        <span className="text-sm font-medium text-ink-2">{bandLabel}</span>
-      </div>
-      {/* The track is a plain 0–100% axis with hairline ticks at the band
-          boundaries (15 / 35 / 60). The ticks are what let a reader judge
-          magnitude, which on a red/green scale would be done by hue — and hue
-          would smuggle in a verdict. Length and position only. */}
-      <div
-        className="relative mt-1.5 h-2 w-full overflow-hidden rounded-sm bg-ink-7"
-        role="img"
-        aria-label={`Overlap ${pct} percent. ${OVERLAP_BAND_LABEL[band]}.`}
-        title={OVERLAP_BAND_LABEL[band]}
-      >
-        <div className={`h-full rounded-sm ${rampClass}`} style={{ width: `${Math.max(2, pct)}%` }} />
-        {[15, 35, 60].map((t) => (
-          <span
-            key={t}
-            aria-hidden
-            className="absolute top-0 h-full w-px bg-paper-raised opacity-70"
-            style={{ left: `${t}%` }}
-          />
-        ))}
-      </div>
-      {showBandNote && <p className="mt-1.5 text-xs leading-snug text-ink-3">{bandNote}</p>}
-      {showExplainer && <ScoreExplainer plain={plain} />}
-    </div>
-  );
-}
-
-/**
- * The band note for a score, so a list can say once what its rows would
- * otherwise each say. Wording still comes from @ftm/core; this only picks.
- */
-export function bandNoteFor(score: number, plain: boolean): string {
-  const band = overlapBand(score);
-  return plain ? OVERLAP_BAND_PLAIN_NOTE[band] : OVERLAP_BAND_NOTE[band];
-}
-
-/** The distinct bands present in a set of scores, in ascending band order. */
-export function distinctBands(scores: number[]): number[] {
-  const order: Record<string, number> = { minimal: 0, some: 1, substantial: 2, high: 3 };
-  const seen = new Map<string, number>();
-  for (const s of scores) {
-    const b = overlapBand(s);
-    if (!seen.has(b)) seen.set(b, s);
-  }
-  return [...seen.entries()].sort((a, b) => order[a[0]] - order[b[0]]).map(([, s]) => s);
 }
 
 /** A visible provenance link. Every figure on this site must be traceable. */

@@ -18,11 +18,12 @@
  *
  * That is a genuine, checkable number, but it is a FLOOR, not a total. Money a
  * sector gave to a member for whom it was that member's 4th-largest sector or
- * below is invisible to this page. In the bundle as generated, the top-three
- * slices cover roughly 54% of the $391M of itemized money attributed to sitting
- * members — so a bit under half of the attributable money is not counted in any
- * row below. The page says so on screen; the honest framing is "at least this
- * much", never "this much".
+ * below is invisible to this page. The share it does cover is computed from the
+ * bundle at render time and printed on screen rather than written down here — in
+ * the current bundle it is 13% of the money reported to sitting members, and an
+ * earlier bundle put it near half, so any figure hardcoded in this comment would
+ * be wrong within a cycle. The honest framing is "at least this much", never
+ * "this much".
  *
  * Two consequences worth understanding before reading the ranking:
  *  - Sectors that give BROADLY but never dominate any one member (a few
@@ -38,7 +39,22 @@
  *
  * Bill counts and federal-award totals have no such caveat: bills.json carries
  * every tag for every bill, and awards.json carries every award in the bundle
- * (itself capped — see /spending).
+ * (itself capped to the largest few thousand awards in the country).
+ *
+ * ---------------------------------------------------------------------------
+ * WHY NOTHING HERE OPENS A SECTOR PAGE ANY MORE
+ *
+ * Each sector used to have its own page, and its headline block was "members who
+ * received the most from donors in this sector". That list was built from the
+ * same truncated top-three field described above, so it ranked people using
+ * roughly an eighth of the money — a ranking of named people that could not be
+ * made correct from the file it read. It has been deleted.
+ *
+ * This page stays because it does not need that file to be useful: it is the
+ * taxonomy itself, with each group's definition, how many bills carry the tag
+ * (complete), and how much federal award money went to it (complete). Where a
+ * reader can go next is the bills carrying a tag, so that is what the rows link
+ * to. Do not restore a per-sector page on top of `donorSummary.top`.
  * ---------------------------------------------------------------------------
  */
 
@@ -160,9 +176,9 @@ export default function Industries() {
       <h1 className="text-xl font-semibold text-ink-0">Sectors</h1>
       <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-2">
         {sectorCount} broad groups of employers, plus {nonSectorCount} groups that are not industries
-        at all. Pick one to see the bills it touches, the members it funds most, and the federal
-        money going the other way. The groups are rough on purpose — they are built from what donors
-        write on their own filings.
+        at all. Each row says what the group means, how much money was reported from it, and how many
+        bills carry its tag. The groups are rough on purpose — they are built from what donors write
+        on their own filings.
       </p>
       <FramingNote className="mt-2 max-w-measure-wide" />
       <ViewToggle className="mt-3" />
@@ -215,9 +231,7 @@ export default function Industries() {
         <ul className="grid gap-3 sm:grid-cols-3">
           {bucketRows.map((r) => (
             <li key={r.meta.id} className="card p-4">
-              <Link to={`/industries/${r.meta.id}`} className="tap-24 text-base font-medium text-ink-0 hover:text-accent">
-                {r.meta.label}
-              </Link>
+              <h3 className="text-base font-medium text-ink-0">{r.meta.label}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-3">{r.meta.blurb}</p>
               <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-4">
                 <div>
@@ -244,10 +258,10 @@ export default function Industries() {
           </CoverageNote>
           {otherRow && (
             <p className="text-xs leading-relaxed text-ink-4">
-              A fourth bucket, <Link className="link" to="/industries/other">Other / Unclassified</Link>,
-              holds money whose disclosed employer text could not be placed at all. It is excluded from
-              every overlap score rather than being guessed at, and each member's page reports their own
-              unattributed share.
+              A fourth bucket, <strong className="font-medium text-ink-2">Other / Unclassified</strong>,
+              holds money whose disclosed employer text could not be placed at all. It is left out of
+              every sector figure rather than being guessed at, and each member's page accounts for
+              their own unattributed share in full.
             </p>
           )}
         </div>
@@ -286,9 +300,7 @@ export default function Industries() {
             {sectorRows.map((r) => (
               <li key={r.meta.id} className="py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <Link to={`/industries/${r.meta.id}`} className="tap-24 text-base font-medium text-ink-0 hover:text-accent">
-                    {r.meta.label}
-                  </Link>
+                  <h3 className="text-base font-medium text-ink-0">{r.meta.label}</h3>
                   <span className="tnum shrink-0 text-sm text-ink-2">
                     {r.disclosed > 0 ? `≥ ${usd(r.disclosed, { compact: true })}` : '—'}
                   </span>
@@ -304,9 +316,16 @@ export default function Industries() {
                 </div>
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-4">
-                  <span className="tnum">
-                    {r.bills} bill{r.bills === 1 ? '' : 's'} tagged
-                  </span>
+                  {/* The one live destination for a sector: the bills carrying
+                      its tag. That comes from bills.json, which holds every tag
+                      for every bill, so the list behind this link is complete. */}
+                  {r.bills > 0 ? (
+                    <Link className="link tnum" to={`/bills?industry=${r.meta.id}`}>
+                      {r.bills} bill{r.bills === 1 ? '' : 's'} tagged →
+                    </Link>
+                  ) : (
+                    <span className="tnum">no bills tagged</span>
+                  )}
                   <span className="tnum">
                     a top-three source for {r.members} member{r.members === 1 ? '' : 's'}
                   </span>
@@ -315,9 +334,6 @@ export default function Industries() {
                       {usd(r.awards, { compact: true })} in federal awards ({r.awardCount})
                     </span>
                   )}
-                  <Link className="link" to={`/industries/${r.meta.id}`}>
-                    Open sector →
-                  </Link>
                 </div>
               </li>
             ))}

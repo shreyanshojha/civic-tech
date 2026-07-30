@@ -34,18 +34,21 @@ problem and it is the correct one.
 
 ### No red/green magnitude scale
 
-Overlap scores use `.ramp-0` … `.ramp-3`, four steps of **one hue** varying only
-in weight. A high overlap is not bad. A member whose donor sectors overlap with
-a bill they worked on is, in the overwhelming majority of cases, a member who
-sits on a committee relevant to their district — which is how the institution is
-designed to work. Rendering an 80% overlap in red would state a conclusion that
-the data cannot support, in a channel the reader processes before they read a
-word of the caveat sitting next to it.
+Every bar on this site is **one hue**, filled from the neutral ink ramp, and
+encodes size with **length alone**. Length is a quantity. Hue is a judgement.
+These charts are only allowed to express a quantity. A large figure about a
+member is not "bad": a member whose donors sit in the industries of their own
+district is, in the overwhelming majority of cases, a member who sits on a
+committee relevant to that district, which is how the institution is designed to
+work. Rendering that in red would state a conclusion the data cannot support, in
+a channel the reader processes before they read a word of the caveat next to it.
 
-The bar in `<OverlapScore/>` therefore encodes magnitude with **length and
-position only**: a plain 0–100% track with hairline ticks at the band boundaries
-(15 / 35 / 60). Length is a quantity. Hue is a judgement. This chart is only
-allowed to express a quantity.
+`.ramp-0` … `.ramp-3` used to exist for the member×bill overlap score. That score
+was cut from every page — three independent evaluations found it was the
+product's headline metric and was worthless, and the site's own `/how-to-read`
+called it "a bookmark, not a finding" — and the four fills went with it. The rule
+above outlives them and governs the sector bars, the cohort plot and every bar
+added later.
 
 ### Amber is reserved
 
@@ -113,13 +116,15 @@ how a reader learns to skip the class of thing it belongs to, and — measured i
 testing — how a low-trust reader reads volume as motive.
 
 So: **a qualification that is identical across the rows of a list is stated once,
-above the list, and suppressed on the rows.** `<OverlapScore showBandNote={false}/>`
-is the sanctioned way to do that for a band note, and `bandNoteFor()` /
-`distinctBands()` in `Framing.tsx` build the single statement so the wording
-still comes from `@ftm/core`. It is only legal in a list, and only when the list
-carries the equivalent statement. The band **label** and the formal band in the
-bar's accessible name still travel with every individual score, so no single
-number is ever stripped of its meaning.
+above the list, and suppressed on the rows.** It is only legal in a list, and only
+when the list carries the equivalent statement.
+
+The worked example of this rule used to be the per-row band note under each
+overlap score, said once above the list by `bandNoteFor()` / `distinctBands()`.
+The score, the notes and those two helpers are all gone. The rule is not: the
+`.data-limit` under a member's sector bars is one statement about every bar above
+it, and `PATTERN_LIMITS` is stated once per patterns page rather than once per
+comparison.
 
 Measured on a member page (`/reps/A000055`), counting `.data-limit`, `.caveat`,
 `.framing-note`, per-row band notes and unmarked prose qualifiers:
@@ -213,9 +218,9 @@ deliberate difference rather than as a rendering inconsistency.
 | `text-sm` | 13.5 px | 1.55 | secondary body, table cells, list detail lines |
 | `text-base` | 15 px | 1.6 | body prose — the default |
 | `text-md` | 17 px | 1.5 | `<SectionTitle/>` h2, lead paragraphs |
-| `text-lg` | 20 px | 1.3 | figures in `<Stat/>`, small `<OverlapScore/>` |
+| `text-lg` | 20 px | 1.3 | figures in `<Stat/>`, small figures |
 | `text-xl` | 24 px | 1.22 | index-page h1 |
-| `text-2xl` | 31 px | 1.15 | detail-page h1 (serif), large `<OverlapScore/>` |
+| `text-2xl` | 31 px | 1.15 | detail-page h1 (serif), large figures |
 | `text-3xl` | 40 px | 1.06 | the home hero, and nothing else |
 
 **Do not add `text-[13px]`.** The scale replaced fourteen ad-hoc arbitrary sizes
@@ -290,9 +295,11 @@ You may restyle it. You may not:
 - add a dismiss control,
 - make it conditional on route or scroll,
 - reduce its prominence,
-- remove `<ScoreExplainer/>` from anywhere a score appears, or render a bare
-  number without going through `<OverlapScore/>`,
-- soften or hide a coverage caveat.
+- soften or hide a coverage caveat,
+- restore the member×bill overlap score. It was removed from every page on
+  purpose; `<OverlapScore/>` and `<ScoreExplainer/>` no longer exist. The strings
+  behind them still sit in `@ftm/core` for the pipeline and the tests, which makes
+  reintroducing them a two-line change and therefore worth naming here.
 
 One thing you now *must* do that you previously did not: **render at most one
 on-page framing block per screen, and never the banner's own sentence.** The
@@ -401,11 +408,10 @@ paper-coloured spacer ring, so it stays visible on top of the `accent-soft` and
 `caveat-soft` fills as well as on plain paper. Verified: 256 focusable elements
 at 375px and at 1440px, 0 without a visible ring.
 
-Heading order is verified per route: exactly one `h1`, no skipped levels, on all
-11 routes. Card titles are real headings (`h3`/`h4` carrying `.label`), not
-styled `<div>`s, so "jump to the next heading" reaches them; the member and bill
-cards in an overlap list carry an `h3` of their own, which is also what keeps
-`<WhatThisMeans/>`'s `h4`s from jumping straight from `h2`.
+Heading order is verified per route: exactly one `h1` and no skipped levels, on
+every route including the not-found page. Card titles are real headings (`h3`/`h4`
+carrying `.label`), not styled `<div>`s, so "jump to the next heading" reaches
+them.
 
 ### Route changes are announced, and the skip link is a button
 

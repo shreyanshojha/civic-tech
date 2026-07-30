@@ -57,7 +57,7 @@ const LIMITS: Limit[] = [
         correctly reported. What is missing is the layer beneath: a super PAC's own donors are
         disclosed on its own separate filing, which this pipeline does not traverse. So the money is
         counted, and the sector behind it is simply not visible from here. It is labelled{' '}
-        <Link className="link" to="/industries/super-pac-unattributed">funding source not visible</Link>{' '}
+        <strong className="font-medium text-ink-1">funding source not visible</strong>{' '}
         rather than being assigned a sector, because assigning one would be an invention and calling
         it “unclassified” would imply the tool failed at something it never attempted.
       </>
@@ -95,16 +95,19 @@ const LIMITS: Limit[] = [
     ),
   },
   {
-    heading: 'Overlap is exactly what ordinary representation looks like',
+    heading: 'Money lining up with subject matter is what ordinary representation looks like',
     body: (
       <>
         This is the mistake that matters most. Members seek committee assignments relevant to their
-        districts. Industries concentrated in a district fund that district's representative. A member
-        from a farming district will score high on an agriculture bill, and should — that pattern is
-        what representation produces, and it is indistinguishable, in this data, from what capture
-        would produce. A high score is therefore not surprising and not damning. Constituent interest,
-        party position, ideology, personal conviction and the substance of the bill itself are all
-        more likely explanations for any given vote than a contribution.
+        districts. Industries concentrated in a district fund that district's representative. So a
+        member from a farming district takes farm money and works on farm bills — that pattern is what
+        representation produces, and it is indistinguishable, in this data, from what capture would
+        produce. Finding the two lists lining up is therefore not surprising and not damning. It is
+        also why this site no longer prints a single number for how much one member's money lines up
+        with one bill: the number was read as a verdict and it could only ever have been a
+        coincidence of geography. Constituent interest, party position, ideology, personal conviction
+        and the substance of the bill itself are all more likely explanations for any given vote than
+        a contribution.
       </>
     ),
   },
@@ -113,8 +116,9 @@ const LIMITS: Limit[] = [
     body: (
       <>
         A bundle covers one election cycle and one Congress. Federal awards are truncated to the
-        largest by value rather than the complete record. Bills with no usable metadata get no tags
-        and therefore no overlap at all, so they are absent rather than scored as zero. Members whose
+        largest by value rather than the complete record. Bills with no usable metadata get no
+        industry tags at all, so they are absent from every sector list rather than tagged as zero.
+        Members whose
         FEC candidate records could not be linked to a bioguide ID have no donor profile and appear
         nowhere in any money figure. Roll-call vote positions are missing entirely unless a free
         Congress.gov key was configured when the bundle was built. Absence on this site is very often
@@ -132,7 +136,7 @@ const LIMITS: Limit[] = [
         output is a question, and the correct next step for any question that seems worth pursuing is
         a primary source — the bill text, the filing, the member's own stated reasoning, all linked
         from the relevant page — or a reporter who can do the parts this cannot. A screenshot of a
-        score is not a finding, and publishing one as though it were does real harm to somebody who
+        number is not a finding, and publishing one as though it were does real harm to somebody who
         may have done nothing at all.
       </>
     ),
@@ -248,8 +252,8 @@ export default function Limitations() {
           </li>
           <li>
             <strong className="font-semibold">4. Check whether the sector is simply in the
-            district.</strong> If it is, the overlap has an unremarkable explanation and the finding
-            probably dissolves.
+            district.</strong> If it is, the money lining up with the subject has an unremarkable
+            explanation and the finding probably dissolves.
           </li>
           <li>
             <strong className="font-semibold">5. If it still holds up, take it to a reporter.</strong>{' '}

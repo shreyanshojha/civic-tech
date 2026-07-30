@@ -30,37 +30,32 @@
  *     asserting the framing language lives in one place, and a "how to read"
  *     page is the single most tempting place to quietly write a fifth version
  *     of it.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS PAGE USED TO TEACH THE MATCH NUMBER. THE MATCH NUMBER IS GONE.
+ *
+ * Two whole sections went with it: "How to read the match number" — a demo
+ * score, the score explainer, and the four band names — and "Four dull reasons a
+ * big match happens". This page's own sentence about that number was the clearest
+ * verdict anybody wrote on it: "A big match says 'this page may be worth ten
+ * minutes'. It says nothing else. It is a bookmark, not a finding." Three
+ * independent evaluations of the site agreed, so the number was cut from every
+ * page rather than explained better.
+ *
+ * The honesty was not deleted, it was redirected. The four dull reasons still
+ * have a section, because they are exactly the reasons a committee gap on
+ * /patterns is usually ordinary, and the reasons a member's own page looks the
+ * way it does. What replaced the demo score is a section on reading the money on
+ * a member's page: the names, the floor under every share, and the control that
+ * can answer "no".
  * ---------------------------------------------------------------------------
  */
 
 import { Link } from 'react-router-dom';
-import {
-  NO_ACCUSATION,
-  OVERLAP_BAND_PLAIN,
-  SCORE_EXPLAINER,
-  overlapBand,
-} from '@ftm/core';
-import { FramingNote, OverlapScore } from '../components/Framing';
+import { NO_ACCUSATION } from '@ftm/core';
+import { FramingNote } from '../components/Framing';
 import { Term } from '../components/Glossary';
 import { SectionTitle } from '../components/ui';
-
-/**
- * One demo score, and it is invented on purpose.
- *
- * A real member and a real bill would turn a teaching example into a claim
- * about a named person, on the one page where the reader has not yet been told
- * how to read it. 42% lands in the third band, which is the band a reader is
- * most likely to meet and most likely to over-read.
- */
-const DEMO_SCORE = 0.42;
-
-/** The four bands, in order, with the number that produces each one. */
-const BANDS: { score: number; when: string }[] = [
-  { score: 0.05, when: 'Under 15%' },
-  { score: 0.25, when: '15% to 35%' },
-  { score: 0.45, when: '35% to 60%' },
-  { score: 0.75, when: '60% and up' },
-];
 
 /** A numbered walkthrough. The number is in the heading so it is announced. */
 function Walkthrough({
@@ -121,8 +116,8 @@ export default function HowToRead() {
         <Link className="link font-medium text-ink-1" to="/methodology">
           How the numbers work
         </Link>{' '}
-        shows how each number is built, step by step, with one score worked out by hand. Come here
-        to learn how to read a page. Go there to check the arithmetic.
+        names every file the figures come from, and every threshold and test the code applies. Come
+        here to learn how to read a page. Go there to check the working.
       </p>
 
       {/* The one framing block on this page. It carries DISCLAIMER_MEDIUM, not
@@ -133,12 +128,13 @@ export default function HowToRead() {
       <section className="mt-10">
         <SectionTitle>The one question this site answers</SectionTitle>
         <p className="max-w-measure text-md leading-relaxed text-ink-1">
-          Which industries gave reported money to a member of Congress, which industries a bill
-          would affect, and where those two lists share the same names.
+          Who gave reported money to a member of Congress, and what that member's Congress is working
+          on.
         </p>
         <p className="mt-3 max-w-measure text-base leading-relaxed text-ink-2">
-          That is the whole question. Both lists are public. Nobody had put them side by side in one
-          place, so this site does that, and links every number back to the filing it came from.
+          Both lists are public. Nobody had put them in one place, so this site does that, and links
+          every number back to the filing it came from. It stops there. It does not score how well the
+          two lists line up for one person, because a number like that cannot be read — see below.
         </p>
 
         {/* The honest answer to "what can I learn here" is: not much from one
@@ -153,7 +149,7 @@ export default function HowToRead() {
             Committees
           </Link>{' '}
           compares a whole committee with the members of the same chamber who are not on it. One
-          member's percentage tells you very little on its own. Fifty of them, next to four hundred
+          person's share tells you very little on its own. Fifty of them, next to four hundred
           others, can be tested — and that page shows every test, including the ones that failed.
         </p>
 
@@ -203,44 +199,15 @@ export default function HowToRead() {
             ]}
             then={
               <>
-                Their page shows how much money was reported for them, which industries it came
-                from, and the bills they worked on. Nothing you type is sent anywhere. The ZIP file
-                is read on your own device.
+                Their page opens with the names of the biggest reported givers, then how much was
+                reported in all, then the sectors it came from. Nothing you type is sent anywhere.
+                The ZIP file is read on your own device.
               </>
             }
           />
           <Walkthrough
             n={2}
-            title="See what an industry gave, and to whom"
-            to="/industries"
-            linkLabel="Go to Sectors"
-            steps={[
-              <>
-                Open <strong className="font-semibold text-ink-1">Sectors</strong> in the top menu.
-                A sector is a rough group of employers, like banking or farming.
-              </>,
-              <>Pick one from the list, or tap a sector name anywhere else on the site.</>,
-              <>
-                On the sector page, read{' '}
-                <em className="not-italic font-medium text-ink-1">Members who received the most from
-                donors in this sector</em>.
-              </>,
-              <>
-                Then read <em className="not-italic font-medium text-ink-1">Bills this sector is
-                tagged on</em>.
-              </>,
-            ]}
-            then={
-              <>
-                Those two lists are the money side and the lawmaking side of one sector. The list of
-                members is not a ranking of anybody. It is who the reported money went to, largest
-                first.
-              </>
-            }
-          />
-          <Walkthrough
-            n={3}
-            title="Open a bill and see who has donor money in it"
+            title="Open a bill and find out what it does"
             to="/bills"
             linkLabel="Go to Bills"
             steps={[
@@ -250,75 +217,143 @@ export default function HowToRead() {
               </>,
               <>
                 On a bill page, read{' '}
-                <em className="not-italic font-medium text-ink-1">What this bill does</em> first. It
-                is in plain words.
+                <em className="not-italic font-medium text-ink-1">In plain words</em> first: what it
+                does, who it touches, what would change.
               </>,
               <>
                 Then <em className="not-italic font-medium text-ink-1">Industries this bill would
-                affect</em>. Each tag carries how sure this tool is of it.
+                affect</em>. Each tag says how sure this tool is of it.
               </>,
               <>
-                Then <em className="not-italic font-medium text-ink-1">Money next to this bill</em>.
-                That lists members who worked on it, with a match number each.
+                Open <em className="not-italic font-medium text-ink-1">The paperwork</em> for the
+                sponsor, the committees, and the official summary word for word.
               </>,
             ]}
             then={
               <>
-                A member appears in that list if they wrote the bill, signed on to it, or sit on the{' '}
-                <Term k="committee">committee of jurisdiction</Term>. Being in the list is not a
-                claim that they did anything. It says they were in a position to.
+                Some bills have a real summary published for them and some have only a title. The
+                page says which of the two you are reading, every time, and never dresses a title up
+                as a description.
+              </>
+            }
+          />
+          <Walkthrough
+            n={3}
+            title="Compare one committee with everyone else"
+            to="/patterns"
+            linkLabel="Go to Committees"
+            steps={[
+              <>
+                Open <strong className="font-semibold text-ink-1">Committees</strong> in the top menu.
+              </>,
+              <>
+                Read the first line. It says how many comparisons were run, and how many passed every
+                check. Both numbers matter.
+              </>,
+              <>
+                Open one from <em className="not-italic font-medium text-ink-1">Worth a look</em> to
+                see every check it passed, and the members behind it.
+              </>,
+              <>
+                Then open <em className="not-italic font-medium text-ink-1">The rest of the
+                search</em>. Those are the ones that failed. They are on the page on purpose.
+              </>,
+            ]}
+            then={
+              <>
+                This is the only place on the site where a comparison has a group on both sides. Even
+                here, the strongest thing said is that a gap is worth reading about. A{' '}
+                <Term k="committee">committee of jurisdiction</Term> attracts the money of the
+                industries it handles, which is an ordinary reason for a gap.
               </>
             }
           />
         </ol>
+        {/* The Sectors page is a taxonomy list, not a walkthrough: there is
+            nothing to do on it but read. It still needs naming here, because a
+            reader who meets "Insurance" on a member page needs to know where the
+            definition lives. */}
+        <p className="mt-3 max-w-measure text-base leading-relaxed text-ink-2">
+          One more page is worth knowing about.{' '}
+          <Link className="link font-medium text-ink-1" to="/industries">Sectors</Link> lists every
+          group of employers this site sorts money into, says what each one covers, and links to the
+          bills tagged with it. Three of the groups are not industries at all, and it says which and
+          why.
+        </p>
       </section>
 
-      {/* ---- the match number --------------------------------------------- */}
+      {/* ---- reading a member's money -------------------------------------
+          This section replaced "How to read the match number". The number it
+          taught is gone from the site; what a reader actually meets on a member
+          page is a list of names, a set of shares, and a gap. Those need reading
+          advice more than a deleted percentage did. */}
       <section className="mt-10">
-        <SectionTitle note={<Link className="link" to="/methodology">The exact formula →</Link>}>
-          How to read the match number
+        <SectionTitle note={<Link className="link" to="/methodology">Where the figures come from →</Link>}>
+          How to read a member's money
         </SectionTitle>
-
-        <div className="grid gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
-          <div className="card-data self-start p-4">
-            <div className="label mb-2">An invented example</div>
-            <OverlapScore score={DEMO_SCORE} size="lg" plain />
-            <p className="mt-3 text-sm leading-relaxed text-ink-3">
-              Not a real member and not a real bill. The number and the words under it are drawn by
-              the same code the rest of the site uses.
+        <p className="max-w-measure text-base leading-relaxed text-ink-2">
+          A member's page starts with names: the biggest reported amounts that came with a name on
+          the filing. Read those first. They are the most concrete thing on the site, and you may
+          well recognise some of them.
+        </p>
+        <ol className="mt-4 max-w-measure space-y-4">
+          <li>
+            <h3 className="text-base font-semibold text-ink-0">
+              <span className="tnum mr-1.5 text-ink-4">1.</span>A name is not always a giver
+            </h3>
+            <p className="mt-1 text-base leading-snug text-ink-2">
+              A row marked <Term k="pac">PAC</Term> is a real group that gave under its own name. A
+              row marked <em className="not-italic font-medium text-ink-1">its employees</em> is not
+              one giver at all. It is the employer that people wrote on their own forms, added up.
+              The company gave nothing. Companies are barred by law from giving to federal
+              candidates.
             </p>
-          </div>
+          </li>
+          <li>
+            <h3 className="text-base font-semibold text-ink-0">
+              <span className="tnum mr-1.5 text-ink-4">2.</span>Every share is a floor
+            </h3>
+            <p className="mt-1 text-base leading-snug text-ink-2">
+              On most members, a lot of the money has no employer written on the form. Nobody can put
+              that money in a sector — not this site, not a perfect one. So each page says how much
+              is missing, right under the figure it affects. Read that line before you read the
+              share above it.
+            </p>
+          </li>
+          <li>
+            <h3 className="text-base font-semibold text-ink-0">
+              <span className="tnum mr-1.5 text-ink-4">3.</span>You can ask about one sector, and get
+              a straight no
+            </h3>
+            <p className="mt-1 text-base leading-snug text-ink-2">
+              Only the three largest sectors are shown as bars. If the sector you care about is not
+              one of them, use{' '}
+              <em className="not-italic font-medium text-ink-1">Check a specific industry</em> on the
+              same page. It gives one of three answers: a figure, nothing at all, or “we could not
+              tell” — and it says which, in plain words.
+            </p>
+          </li>
+        </ol>
 
-          <div>
-            {/* SCORE_EXPLAINER verbatim. Rewording it here would put a fifth
-                version of the framing in a fourth file. */}
-            <dl className="max-w-measure space-y-3 text-base leading-relaxed text-ink-2">
-              <div>
-                <dt className="label">What it is</dt>
-                <dd>{SCORE_EXPLAINER.what}</dd>
-              </div>
-              <div>
-                <dt className="label">What it is not</dt>
-                <dd className="text-ink-1">{SCORE_EXPLAINER.whatItIsNot}</dd>
-              </div>
-              <div>
-                <dt className="label">How to use it</dt>
-                <dd>{SCORE_EXPLAINER.howToUse}</dd>
-              </div>
-            </dl>
-          </div>
-        </div>
-
-        <h3 className="mt-7 text-base font-semibold text-ink-0">A big match is normal. Read that twice.</h3>
+        <h3 className="mt-7 text-base font-semibold text-ink-0">
+          There is no “match score” on this site any more
+        </h3>
         <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">
-          This is the part people get wrong. A big number is not a red flag. A member from a farming
-          area takes farm money and works on farm bills. That is their job. It is what representing a
-          place looks like, and it produces a high number every time.
+          Until recently every member page and every bill page carried one percentage: how much of a
+          member's money came from industries that bill would affect. It is gone. It was the biggest
+          number on the site and it could not carry any weight.
         </p>
         <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">
-          So the number is good for one thing only: choosing what to read next. A big match says
-          &ldquo;this page may be worth ten minutes&rdquo;. It says nothing else. It is a
-          bookmark, not a finding.
+          Here is why, in the words this page used to use about it: a big match said “this page may
+          be worth ten minutes”, and nothing else. It was a bookmark, not a finding. A member from a
+          farming area takes farm money and works on farm bills. That is the job. It produced a big
+          number every time, and readers read that number as a verdict.
+        </p>
+        <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">
+          What is left in its place is the{' '}
+          <Link className="link font-medium text-ink-1" to="/patterns">committee comparison</Link>,
+          which asks the same kind of question about a group of fifty people instead of one, and can
+          be tested.
         </p>
 
         {/* NO_ACCUSATION is a different claim from the framing note above —
@@ -328,30 +363,18 @@ export default function HowToRead() {
         <p className="mt-4 max-w-measure-wide border-t border-line pt-3 text-base leading-relaxed text-ink-1">
           {NO_ACCUSATION}
         </p>
-
-        <h3 className="mt-7 text-base font-semibold text-ink-0">The four names for a number</h3>
-        <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">
-          Every match number is also given a name in words. The names are the same four everywhere on
-          the site. They describe size, and nothing more.
-        </p>
-        <ul className="rows mt-3 max-w-2xl">
-          {BANDS.map((b) => (
-            <li key={b.when} className="flex flex-wrap items-baseline gap-x-3 py-2">
-              <span className="tnum w-28 shrink-0 text-sm text-ink-3">{b.when}</span>
-              <span className="text-base font-medium text-ink-0">
-                {OVERLAP_BAND_PLAIN[overlapBand(b.score)]}
-              </span>
-            </li>
-          ))}
-        </ul>
       </section>
 
-      {/* ---- the four ordinary explanations -------------------------------- */}
+      {/* ---- the four ordinary explanations --------------------------------
+          These four used to explain away a big match number. They apply just as
+          well to what is left: a member whose donors sit in their own subject
+          area, and a committee whose money looks different from everyone else's.
+          The honesty is the same; only the thing it is pointed at changed. */}
       <section className="mt-10">
-        <SectionTitle>Four dull reasons a big match happens</SectionTitle>
+        <SectionTitle>Four dull reasons the money lines up</SectionTitle>
         <p className="mb-3 max-w-measure text-base leading-relaxed text-ink-2">
-          When the site finds one of these on the record, it says so on the page, above everything
-          else. Check them before you think anything. One of them is usually the whole story.
+          This holds whether you are reading one member's page or a committee comparison. Check these
+          four first. One of them is usually the whole story.
         </p>
         <ol className="max-w-measure space-y-4">
           <li>
@@ -359,9 +382,10 @@ export default function HowToRead() {
               <span className="tnum mr-1.5 text-ink-4">1.</span>They sit on the committee
             </h3>
             <p className="mt-1 text-base leading-snug text-ink-2">
-              The <Term k="committee">committee of jurisdiction</Term> is the group that handles this
+              The <Term k="committee">committee of jurisdiction</Term> is the group that handles one
               subject. Members ask for the committee that covers the industries back home. So the
-              money and the subject line up by design.
+              money and the subject line up by design. This is the main reason a committee's money
+              can differ from everybody else's without anything being wrong.
             </p>
           </li>
           <li>
@@ -378,8 +402,9 @@ export default function HowToRead() {
               <span className="tnum mr-1.5 text-ink-4">3.</span>The industry is simply big in that state
             </h3>
             <p className="mt-1 text-base leading-snug text-ink-2">
-              If the same industry is the top donor for several members of the same state, the fact
-              is about the state, not about one person. The site checks this and tells you the count.
+              If the same industry is the top source for several members of one state, the fact is
+              about the state, not about a person. Every committee comparison reports how many
+              different states its ten largest members come from, for exactly this reason.
             </p>
           </li>
           <li>
@@ -387,8 +412,10 @@ export default function HowToRead() {
               <span className="tnum mr-1.5 text-ink-4">4.</span>The total is small
             </h3>
             <p className="mt-1 text-base leading-snug text-ink-2">
-              A match is a share of a total. When the total is small, one ordinary cheque makes a
-              big share. Always look at the dollar figure next to the percentage.
+              A share is always a share of a total. When the total is small, one ordinary cheque
+              makes a big share. Always look at the dollar figure next to a percentage. Committee
+              comparisons leave out members with very little reported money for this reason, and say
+              how many were left out.
             </p>
           </li>
         </ol>
@@ -398,15 +425,15 @@ export default function HowToRead() {
       <section className="mt-10">
         <SectionTitle>What would make it worth someone's attention</SectionTitle>
         <p className="mb-3 max-w-measure text-base leading-relaxed text-ink-2">
-          A big match on its own is not a story. These four checks are what the site puts next to
-          every match number. Not one of them can be answered from this site alone. That is the
-          point: the number sends you somewhere else.
+          Money sitting near a subject is not a story. These are the four checks that would begin to
+          make one. Not one of them can be answered from this site alone. That is the point: this
+          site is where the question starts, not where it ends.
         </p>
         <ol className="max-w-measure space-y-3 text-base leading-snug text-ink-2">
           <li>
-            <strong className="font-semibold text-ink-1">1. Find the vote.</strong> The match number
-            does not use it at all. Many bills never get a{' '}
-            <Term k="rollCall">roll-call vote</Term>, so there may be nothing to find.
+            <strong className="font-semibold text-ink-1">1. Find the vote.</strong> Nothing on this
+            site uses one. Many bills never get a <Term k="rollCall">roll-call vote</Term> at all, so
+            there may be nothing to find.
           </li>
           <li>
             <strong className="font-semibold text-ink-1">2. Look at members who took none of that
@@ -491,8 +518,8 @@ export default function HowToRead() {
             }
             doThis={
               <>
-                Never read a match number as a sequence of events. If dates matter to your question,
-                you need the filings themselves, which every figure links to.
+                Never read money near a subject as a sequence of events. If dates matter to your
+                question, you need the filings themselves, which every figure links to.
               </>
             }
           />
@@ -510,7 +537,7 @@ export default function HowToRead() {
           </li>
           <li>
             <strong className="font-semibold text-ink-1">2. Rule out the four dull reasons
-            first.</strong> Committee seat, they wrote it, the industry is big in the state, the
+            first.</strong> Committee seat, they wrote the bill, the industry is big in the state, the
             total is small. Most findings dissolve right here, and that is a good outcome.
           </li>
           <li>

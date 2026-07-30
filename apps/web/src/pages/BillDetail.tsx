@@ -2,7 +2,28 @@
  * One bill.
  *
  * ---------------------------------------------------------------------------
- * READING ORDER, AND WHY IT CHANGED
+ * THIS PAGE IS ABOUT THE BILL. THAT IS THE WHOLE SCOPE.
+ *
+ * It used to end with two money sections: a diagram putting one member's donor
+ * sectors next to the bill, and "Members on this bill, and who funded them" —
+ * every member with a percentage of their reported money that came from sectors
+ * the bill would affect, plus the arithmetic behind that percentage and a
+ * share-image button. Both are gone, along with the "Members with an overlap"
+ * count in the sidebar.
+ *
+ * Three independent evaluations of the live site — a product manager, an
+ * ordinary voter and a working reporter — reached the same conclusion on their
+ * own: that percentage was the product's headline metric and it was worthless.
+ * The site's own reading guide already said so: a big match "is a bookmark, not
+ * a finding". The bill's own data file still carries the overlap rows; this page
+ * does not read them.
+ *
+ * What is left is what this page can say about the bill itself. 322 bills in
+ * this bundle carry a real written summary, which is the reason these pages are
+ * worth opening at all.
+ *
+ * ---------------------------------------------------------------------------
+ * READING ORDER, AND WHY IT IS THIS WAY
  *
  * The page used to open with the legal title — "Referred to the Committee on
  * Energy and Commerce, and in addition to the Committees on Agriculture, Ways
@@ -11,43 +32,32 @@
  * checking a detail. It is the wrong order for everyone else, who has exactly
  * one question: what does this thing do?
  *
- * So the order is now:
+ * So the order is:
  *      1. what the bill does, in plain words
- *      2. which industries it would affect, as big tappable chips
- *      3. one picture of where the money sits next to it
- *      4. the members, with the overlap number
- *      5. everything else, folded: legal title, official summary, subject
- *         terms, committees, votes, provenance
- *
- * Nothing from the old page was removed. The legal title, the CRS summary, the
- * Library of Congress subject terms and the full arithmetic are all still on
- * this page, one tap away, and all of them open at once in full detail view.
+ *      2. which industries it would affect, with the tool's own confidence
+ *      3. everything else, folded: legal title, official summary, subject
+ *         terms, committees, votes, sponsor and cosponsors, provenance
  * ---------------------------------------------------------------------------
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  INDUSTRY_BY_ID, PLAIN_BILL_FRAMING, billLabel as fmtBillLabel, describeOverlap, measureType,
-  plainAmount, plainShare, shortDate, usd,
+  INDUSTRY_BY_ID, PLAIN_BILL_FRAMING, billLabel as fmtBillLabel, measureType, shortDate,
 } from '@ftm/core';
 import { getBillDetail, getLegislators } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { useViewMode } from '../lib/view';
-import { CoverageNote, DataLimit, FramingNote, OverlapScore, ReportProblemLink, SourceLink } from '../components/Framing';
-import { Empty, ErrorState, IndustryBars, Loading, MemberAvatar, MethodTag, PartyTag, SectionTitle } from '../components/ui';
-import { ShareCardButton } from '../components/ShareCard';
+import { CoverageNote, DataLimit, ReportProblemLink, SourceLink } from '../components/Framing';
+import { Empty, ErrorState, Loading, MethodTag, PartyTag, SectionTitle } from '../components/ui';
 import { Fold, ViewToggle } from '../components/ViewToggle';
-import { MoneyFlow } from '../components/MoneyFlow';
 import { Term } from '../components/Glossary';
-import { WhatThisMeans } from '../components/WhatThisMeans';
 
 export default function BillDetail() {
   const { id = '' } = useParams();
   const { data, error, loading } = useAsync(() => getBillDetail(id), [id]);
   const { data: legislators } = useAsync(getLegislators, []);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const { isQuick, setView } = useViewMode();
+  const { isQuick } = useViewMode();
   const legByBio = useMemo(() => new Map((legislators ?? []).map((l) => [l.bioguideId, l])), [legislators]);
 
   const label = useMemo(() => {
@@ -59,12 +69,12 @@ export default function BillDetail() {
   if (loading || !data) {
     return (
       <div className="mx-auto max-w-content px-4">
-        <Loading what="this bill: what it does, and who worked on it" />
+        <Loading what="this bill: what it does, and who handles it" />
       </div>
     );
   }
 
-  const { bill, classification, overlaps, votes } = data;
+  const { bill, classification, votes } = data;
   // Generated in the export step by `explainBillPlainly`, never here. Optional
   // so a bundle built before this existed still renders.
   const plain = data.plain ?? null;
@@ -72,31 +82,9 @@ export default function BillDetail() {
   const prettyLabel = fmtBillLabel(bill.billType, bill.billNumber);
   const measure = measureType(bill.billType);
 
-  /**
-   * ΣC — the denominator of the bill weights.
-   *
-   * `computeOverlap` drops any tag below 0.25 confidence and then normalises
-   * what is left, so this has to be summed over exactly that set or the weight
-   * column would not reproduce the contributions. The threshold is mirrored
-   * from packages/core/src/overlap.ts; if it ever changes there, this changes
-   * with it. (Verified against the shipped bundle: for every multi-tag bill,
-   * `billConfidence × donorShare ÷ contribution` equals this sum.)
-   */
-  const MIN_BILL_CONFIDENCE = 0.25;
-  const scoringTags = (classification?.industries ?? []).filter((i) => i.confidence >= MIN_BILL_CONFIDENCE);
-  const confidenceSum = scoringTags.reduce((s, i) => s + i.confidence, 0);
-  const tagCount = scoringTags.length;
-
   // The plain summary's first paragraph is the lead. The rest follows it, and
   // nothing is dropped — a two-paragraph summary still shows both paragraphs.
   const summaryParas = classification?.plainSummary?.split('\n\n').filter(Boolean) ?? [];
-
-  const shownOverlaps = isQuick ? overlaps.slice(0, 3) : overlaps;
-
-  // The picture uses the strongest single pairing on the page, because a
-  // diagram of 135 members is not a diagram. Which member it is, is stated in
-  // the words underneath it.
-  const flowFor = overlaps.find((o) => o.matches.length > 0) ?? null;
 
   return (
     <div className="mx-auto max-w-content px-4 py-6 pb-14">
@@ -236,30 +224,37 @@ export default function BillDetail() {
             {!classification || classification.industries.length === 0 ? (
               <CoverageNote>
                 We could not tie this bill to any industry. For naming bills, ceremonial
-                resolutions and housekeeping measures that is the right answer, and no overlap
-                number is worked out.
+                resolutions and housekeeping measures that is the right answer.
               </CoverageNote>
             ) : (
               <>
+                {/* These were links to a per-sector page. That page ranked
+                    members using only each member's three largest donor sectors
+                    — about an eighth of the money — so it is gone, and these are
+                    plain tags. The sector's definition is on `title`; the bills
+                    tagged with it are one filter away on the Bills page. */}
                 <ul className="flex flex-wrap gap-2">
                   {classification.industries.map((i) => (
                     <li key={i.industry}>
-                      <Link
-                        to={`/industries/${i.industry}`}
-                        className="inline-flex min-h-[2.25rem] max-w-full items-center gap-2 rounded-full border border-edge bg-paper-raised px-3.5 py-1.5 text-base font-medium text-ink-1 hover:border-accent hover:text-accent"
+                      <span
+                        title={INDUSTRY_BY_ID[i.industry]?.blurb}
+                        className="inline-flex min-h-[2.25rem] max-w-full items-center gap-2 rounded-full border border-edge bg-paper-raised px-3.5 py-1.5 text-base font-medium text-ink-1"
                       >
                         <span className="min-w-0">{INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}</span>
                         <span className="tnum shrink-0 text-xs font-normal text-ink-3">
                           {Math.round(i.confidence * 100)}% sure
                         </span>
-                      </Link>
+                      </span>
                     </li>
                   ))}
                 </ul>
                 <DataLimit className="mt-2">
                   The percentage says <Term k="confidence">how sure this tool is</Term> of the tag.
                   It is not about any member, and not about money. An industry that is not tagged
-                  here was not judged relevant to this bill — it is not a gap in the list.
+                  here was not judged relevant to this bill — it is not a gap in the list.{' '}
+                  <Link className="link" to={`/bills?industry=${classification.industries[0]?.industry ?? ''}`}>
+                    Other bills tagged {INDUSTRY_BY_ID[classification.industries[0]?.industry ?? 'other']?.label ?? 'this sector'} →
+                  </Link>
                 </DataLimit>
 
                 <Fold className="mt-3" open={!isQuick} title="Why each industry was tagged">
@@ -267,9 +262,9 @@ export default function BillDetail() {
                     {classification.industries.map((i) => (
                       <li key={i.industry} className="card p-3">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <Link to={`/industries/${i.industry}`} className="tap-24 text-base font-medium text-ink-0 hover:text-accent">
+                          <span className="text-base font-medium text-ink-0" title={INDUSTRY_BY_ID[i.industry]?.blurb}>
                             {INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}
-                          </Link>
+                          </span>
                           <span className="tnum text-xs text-ink-3">
                             classifier confidence {Math.round(i.confidence * 100)}%
                           </span>
@@ -288,267 +283,6 @@ export default function BillDetail() {
                 bill — so they are rougher than they look. Treat a tag here as a hint about what the
                 bill touches, not as a fact about it.
               </CoverageNote>
-            )}
-          </section>
-
-          {/* ---- 3. one picture ------------------------------------------ */}
-          {flowFor && flowFor.member && (
-            <section>
-              <SectionTitle note="One member, as an example">Money next to this bill</SectionTitle>
-              <MoneyFlow
-                sectors={flowFor.matches.map((m) => ({
-                  industry: m.industry,
-                  label: INDUSTRY_BY_ID[m.industry]?.label ?? m.industry,
-                  amount: m.donorAmount,
-                  share: m.donorShare,
-                }))}
-                memberName={flowFor.member.name}
-                memberHref={`/reps/${flowFor.bioguideId}`}
-                billLabel={prettyLabel}
-                role={flowFor.member.role}
-                cycle={flowFor.cycle}
-              />
-            </section>
-          )}
-
-          {/* ---- 4. the members ------------------------------------------ */}
-          <section>
-            <SectionTitle
-              note={
-                isQuick && overlaps.length > shownOverlaps.length
-                  ? `${shownOverlaps.length} of ${overlaps.length}`
-                  : `${overlaps.length} member${overlaps.length === 1 ? '' : 's'}`
-              }
-            >
-              Members on this bill, and who funded them
-            </SectionTitle>
-            {/* The one framing block on this page. */}
-            <FramingNote className="mb-4" />
-
-            {overlaps.length === 0 ? (
-              <Empty>
-                No member on this bill has campaign money linked to them in this data. That is a gap
-                in the data, not a sign that nobody was funded.
-              </Empty>
-            ) : (
-              <ul className="space-y-3">
-                {shownOverlaps.map((o) => {
-                  const key = o.bioguideId;
-                  const isOpen = expanded === key;
-                  const profile = o.donorProfile;
-                  const top = o.matches[0] ?? null;
-                  return (
-                    <li key={key} className="card p-4">
-                      <div className="flex flex-wrap items-start gap-3">
-                        <MemberAvatar src={o.member?.imageUrl} name={o.member?.name ?? o.bioguideId} size={48} />
-                        <div className="min-w-0 flex-1">
-                          {/* A real heading, so a screen-reader user can jump
-                              between the members on this bill instead of
-                              reading the whole list to find one. */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-medium leading-snug text-ink-0">
-                              <Link to={`/reps/${o.bioguideId}`} className="tap-24 hover:text-accent">
-                                {o.member?.name ?? o.bioguideId}
-                              </Link>
-                            </h3>
-                            <span className="chip">
-                              {o.member?.role === 'Cosponsor' ? (
-                                <Term k="cosponsor">Cosponsor</Term>
-                              ) : (
-                                o.member?.role ?? 'Involved'
-                              )}
-                            </span>
-                          </div>
-                          <div className="text-xs text-ink-3">
-                            {o.member?.chamber === 'Senate' ? 'Sen.' : 'Rep.'} · {o.member?.state}
-                            {o.member?.district ? `-${o.member.district}` : ''}
-                            {profile && (
-                              <> · {plainAmount(profile.totalItemized)} reported, <Term k="cycle">cycle</Term> {profile.cycle}</>
-                            )}
-                          </div>
-                        </div>
-                        <div className="w-full sm:w-56">
-                          <OverlapScore score={o.score} size="md" showExplainer={false} plain={isQuick} />
-                        </div>
-                      </div>
-
-                      {/* Quick view says it in short words; full view keeps the
-                          exact sentence the share card and the export use. */}
-                      {isQuick && top ? (
-                        <p className="mt-3 text-sm leading-relaxed text-ink-2">
-                          Of all the money {o.member?.name ?? 'this member'} reported,{' '}
-                          {plainShare(o.score)} came from industries this bill would affect. The
-                          biggest is{' '}
-                          <Link className="link" to={`/industries/${top.industry}`}>
-                            {INDUSTRY_BY_ID[top.industry]?.label ?? top.industry}
-                          </Link>{' '}
-                          — {plainAmount(top.donorAmount)}.
-                        </p>
-                      ) : (
-                        <p className="mt-3 text-sm leading-relaxed text-ink-2">
-                          {describeOverlap(o, o.member?.name ?? 'this member', label)}
-                        </p>
-
-                      )}
-
-                      <WhatThisMeans
-                        overlap={o}
-                        facts={o.meaning}
-                        memberName={o.member?.name ?? 'This member'}
-                        billLabel={prettyLabel}
-                        totalDisclosed={profile?.totalItemized ?? 0}
-                        hasVote={votes.length > 0}
-                        classificationMethod={classification?.method ?? null}
-                        defaultOpen={!isQuick}
-                      />
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExpanded(isOpen ? null : key)}
-                          className="btn px-2.5 py-1 text-xs"
-                          aria-expanded={isOpen}
-                        >
-                          {isOpen ? 'Hide the maths' : 'Show how this number was worked out'}
-                        </button>
-                        <ShareCardButton
-                          finding={{
-                            memberName: o.member?.name ?? o.bioguideId,
-                            memberSubtitle: `${o.member?.chamber === 'Senate' ? 'Sen.' : 'Rep.'} ${o.member?.state ?? ''}${o.member?.district ? `-${o.member.district}` : ''}`,
-                            billLabel: label,
-                            billTitle: bill.title,
-                            topIndustryLabel: o.matches[0] ? (INDUSTRY_BY_ID[o.matches[0].industry]?.label ?? o.matches[0].industry) : null,
-                            topIndustryAmount: o.matches[0]?.donorAmount ?? null,
-                            score: o.score,
-                            cycle: profile?.cycle ?? null,
-                            // The three qualifiers the card used to drop. The role
-                            // is already on screen in the chip above; the total is
-                            // the denominator of the percentage; the method is how
-                            // the sector tags the score depends on were derived.
-                            role: o.member?.role ?? null,
-                            totalDisclosed: profile?.totalItemized ?? null,
-                            classificationMethod: classification?.method ?? null,
-                            // A bill with no sector tags at all is either
-                            // ceremonial or unclassifiable; either way there is
-                            // nothing here that should become an image.
-                            isCeremonial: (classification?.industries.length ?? 0) === 0,
-                            topIndustryConfidence: classification?.industries[0]?.confidence ?? null,
-                          }}
-                        />
-                        {profile?.sourceUrls[0] && <SourceLink href={profile.sourceUrls[0]}>FEC filings</SourceLink>}
-                      </div>
-
-                      {(isOpen || !isQuick) && (
-                        <div className="mt-4 space-y-4 border-t border-line pt-4">
-                          {/* ---- the arithmetic, so it closes ----------------
-                              This table used to show donor share, bill relevance
-                              and contribution — and a reader multiplying the
-                              first two did not get the third, because relevance
-                              is not the multiplier. The multiplier is the
-                              *normalised* weight C / ΣC. On a bill with one
-                              surviving tag that weight is 1.00 and the
-                              confidence cancels out entirely, which is the
-                              majority case, so the missing column was not an
-                              edge case: it was most of the dataset.
-
-                              The weight is now its own column, ΣC is stated in
-                              the footer note, and share × weight = contribution
-                              on every row.                                   */}
-                          <div className="min-w-0">
-                            <h4 className="label mb-1.5">Shared industries, and what each added to the number</h4>
-                            <div className="scroll-x -mx-1 px-1">
-                              <table className="w-full min-w-[30rem] text-sm">
-                                <thead>
-                                  <tr className="text-left text-2xs uppercase tracking-wide text-ink-3">
-                                    <th scope="col" className="pb-1 font-semibold">Sector</th>
-                                    <th scope="col" className="pb-1 text-right font-semibold">Disclosed from donors in it</th>
-                                    <th scope="col" className="pb-1 text-right font-semibold">Share of their money <span className="normal-case">(D)</span></th>
-                                    <th scope="col" className="pb-1 text-right font-semibold">Classifier confidence <span className="normal-case">(C)</span></th>
-                                    <th scope="col" className="pb-1 text-right font-semibold">Weight <span className="normal-case">(C ÷ ΣC)</span></th>
-                                    <th scope="col" className="pb-1 text-right font-semibold">Adds <span className="normal-case">(D × weight)</span></th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-line">
-                                  {o.matches.map((m) => (
-                                    <tr key={m.industry}>
-                                      <td className="py-1.5 pr-3">
-                                        <Link className="link" to={`/industries/${m.industry}`}>
-                                          {INDUSTRY_BY_ID[m.industry]?.label ?? m.industry}
-                                        </Link>
-                                      </td>
-                                      <td className="tnum py-1.5 text-right">{usd(m.donorAmount, { compact: true })}</td>
-                                      <td className="tnum py-1.5 text-right">{(m.donorShare * 100).toFixed(1)}%</td>
-                                      <td className="tnum py-1.5 text-right">{Math.round(m.billConfidence * 100)}%</td>
-                                      <td className="tnum py-1.5 text-right">
-                                        {confidenceSum > 0 ? (m.billConfidence / confidenceSum).toFixed(2) : '—'}
-                                      </td>
-                                      <td className="tnum py-1.5 text-right">{(m.contribution * 100).toFixed(1)} pts</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            <p className="mt-2 max-w-measure-wide text-xs leading-relaxed text-ink-3">
-                              Confidence is <strong className="font-semibold">normalised</strong> before
-                              it is used: the weight of a sector is its confidence divided by the total
-                              confidence across every sector tagged on this bill, so the weights always
-                              sum to 1.00. Here{' '}
-                              <span className="tnum">ΣC = {confidenceSum.toFixed(2)}</span>
-                              {' '}across {tagCount} tag{tagCount === 1 ? '' : 's'} on this bill
-                              {tagCount === 1 && (
-                                <>
-                                  , so the weight is 1.00 and the confidence column cancels out — it
-                                  does not affect this score at all
-                                </>
-                              )}
-                              . Multiply the D column by the weight column to get the contribution, and
-                              add the contributions to get the {Math.round(o.score * 100)}% above.
-                            </p>
-                          </div>
-
-                          {profile && (
-                            <div>
-                              <h4 className="label mb-1.5">
-                                Everything this member reported, cycle {profile.cycle}
-                              </h4>
-                              <IndustryBars rows={profile.byIndustry.slice(0, 10)} />
-                              <DataLimit className="mt-2">
-                                <span className="tnum">{usd(profile.unclassifiedAmount)}</span> (
-                                {(profile.unclassifiedShare * 100).toFixed(1)}% of the total) has no
-                                sector attached and is left out of the number above.
-                                {profile.nonEmployerAmount > 0 && (
-                                  <>
-                                    {' '}
-                                    <span className="tnum">{usd(profile.nonEmployerAmount)}</span> of
-                                    that is filings with no employer written on them, which is normal
-                                    and can never be assigned to a sector by anyone.
-                                  </>
-                                )}
-                              </DataLimit>
-                            </div>
-                          )}
-
-                          <div>
-                            <h4 className="label mb-1">Exact formula</h4>
-                            <p className="mono text-2xs leading-relaxed text-ink-3">{o.method.formula}</p>
-                          </div>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {isQuick && overlaps.length > shownOverlaps.length && (
-              <div className="mt-4">
-                <button type="button" onClick={() => setView('full')} className="btn">
-                  Show all {overlaps.length} members
-                </button>
-                <p className="mt-1.5 text-xs text-ink-3">
-                  This opens the full detail view, with every table on this page open.
-                </p>
-              </div>
             )}
           </section>
 
@@ -647,10 +381,6 @@ export default function BillDetail() {
                 <dd className="tnum text-ink-1">{classification?.industries.length ?? 0}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-ink-3">Members with an overlap</dt>
-                <dd className="tnum text-ink-1">{overlaps.length}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
                 <dt className="text-ink-3">Cosponsors</dt>
                 <dd className="tnum text-ink-1">{bill.cosponsorBioguideIds.length}</dd>
               </div>
@@ -664,11 +394,17 @@ export default function BillDetail() {
             </p>
           </div>
 
+          {/* This card used to be about money, because the page used to end
+              with money. It does not any more, so the card says what this page's
+              own material cannot tell you instead of qualifying a section that
+              is no longer here. */}
           <div className="card p-4">
             <h3 className="label mb-2">What this page cannot tell you</h3>
             <p className="text-sm leading-relaxed text-ink-2">
-              It sees only money that was reported to the FEC. It cannot see dark money, lobbying
-              spending, or a job offer after someone leaves office.{' '}
+              The industry tags are worked out by this tool, not published by Congress, and they can
+              be wrong. The plain-words summary is only as good as the official summary it was built
+              from, and many bills have none. Nothing here says whether the bill is a good idea, or
+              whether it will pass.{' '}
               <Link className="link" to="/limitations">The full list of gaps →</Link>
             </p>
           </div>
@@ -676,8 +412,8 @@ export default function BillDetail() {
           <div className="card p-4">
             <h3 className="label mb-2">Found a mistake?</h3>
             <p className="text-sm leading-relaxed text-ink-2">
-              The bill text, the summary and every money figure on this page link to the government
-              record behind them. If this page and that record disagree, the page is wrong.
+              The bill text, the summary and every fact on this page link to the government record
+              behind them. If this page and that record disagree, the page is wrong.
             </p>
             <p className="mt-2">
               <ReportProblemLink />

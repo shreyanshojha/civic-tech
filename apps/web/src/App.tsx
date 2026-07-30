@@ -21,8 +21,6 @@ const BillDetailPage = lazy(() => import('./pages/BillDetail'));
 const RepsPage = lazy(() => import('./pages/Reps'));
 const RepDetailPage = lazy(() => import('./pages/RepDetail'));
 const IndustriesPage = lazy(() => import('./pages/Industries'));
-const IndustryDetailPage = lazy(() => import('./pages/IndustryDetail'));
-const SpendingPage = lazy(() => import('./pages/Spending'));
 const PatternsPage = lazy(() => import('./pages/Patterns'));
 const PatternDetailPage = lazy(() => import('./pages/PatternDetail'));
 const HowToReadPage = lazy(() => import('./pages/HowToRead'));
@@ -51,13 +49,21 @@ const AboutPage = lazy(() => import('./pages/About'));
  * members instead of a single member or a single bill. That is also why it earns
  * a nav slot at all: a reader who cannot learn anything from one member's page
  * has nowhere else to go for a comparison that has a sample size.
+ *
+ * `Federal spending` used to have a slot. It is gone, with its page: it opened by
+ * saying it was never evidence and it linked to nothing, so it was a nav slot
+ * spent on a dead end. The district-award list on each member page kept the part
+ * of it that was concrete and local.
+ *
+ * This list is the whole of the nav, and every entry must be a live route. A nav
+ * entry pointing at a route that no longer exists is the fastest way to make the
+ * site look broken.
  */
 const NAV = [
   { to: '/bills', label: 'Bills' },
   { to: '/reps', label: 'Representatives' },
   { to: '/industries', label: 'Sectors' },
   { to: '/patterns', label: 'Committees' },
-  { to: '/spending', label: 'Federal spending' },
   { to: '/how-to-read', label: 'How to read this' },
   { to: '/methodology', label: 'Method' },
   { to: '/about', label: 'About' },
@@ -212,12 +218,45 @@ function ScrollToTop() {
   return <span key={pathname} hidden />;
 }
 
+/**
+ * The catch-all, and why it says more than "not found".
+ *
+ * Two groups of pages were removed from this site: the per-sector pages
+ * (`#/industries/pharma`) and the federal-spending page (`#/spending`). Old
+ * links to them still exist in bookmarks, in other people's notes, and in the
+ * browser history of anybody who used the site last month. All of them land
+ * here.
+ *
+ * A bare "Page not found" reads as a broken site. So this page says where the
+ * live equivalent is and lists the pages that do exist. It is one h1, like every
+ * other route, and it holds the same shell, so nothing about it looks like a
+ * crash.
+ */
 function NotFound() {
   return (
-    <div className="mx-auto max-w-content px-4 py-16">
-      <h1 className="text-lg font-semibold text-ink-0">Page not found</h1>
-      <p className="mt-2 text-base text-ink-3">
-        <Link className="link" to="/">Back to the start</Link>
+    <div className="mx-auto max-w-content px-4 py-12">
+      <h1 className="text-xl font-semibold text-ink-0">That page is not here</h1>
+      <p className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">
+        The address you asked for is not a page on this site. If you followed an old link, two things
+        moved recently:
+      </p>
+      <ul className="mt-3 max-w-measure space-y-2 text-base leading-relaxed text-ink-2">
+        <li>
+          · Each sector used to have its own page. Those are gone. The{' '}
+          <Link className="link font-medium text-ink-1" to="/industries">list of sectors</Link> is
+          still here, and you can see the bills tagged to any sector from{' '}
+          <Link className="link font-medium text-ink-1" to="/bills">Bills</Link>.
+        </li>
+        <li>
+          · The federal spending page is gone too. Federal awards now appear on each member's own
+          page, for their own district — start from{' '}
+          <Link className="link font-medium text-ink-1" to="/reps">Representatives</Link>.
+        </li>
+      </ul>
+      <p className="mt-4 max-w-measure text-base leading-relaxed text-ink-2">
+        Everything else: <Link className="link font-medium text-ink-1" to="/">the start page</Link>,{' '}
+        <Link className="link font-medium text-ink-1" to="/patterns">committees</Link>,{' '}
+        <Link className="link font-medium text-ink-1" to="/how-to-read">how to read this site</Link>.
       </p>
     </div>
   );
@@ -365,8 +404,6 @@ function Shell() {
             <Route path="/reps" element={<RepsPage />} />
             <Route path="/reps/:bioguideId" element={<RepDetailPage />} />
             <Route path="/industries" element={<IndustriesPage />} />
-            <Route path="/industries/:id" element={<IndustryDetailPage />} />
-            <Route path="/spending" element={<SpendingPage />} />
             <Route path="/patterns" element={<PatternsPage />} />
             <Route path="/patterns/:id" element={<PatternDetailPage />} />
             <Route path="/how-to-read" element={<HowToReadPage />} />

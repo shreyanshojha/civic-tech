@@ -90,16 +90,19 @@ function MemberRowBody({ m, cycle }: { m: MemberSummary; cycle?: number }) {
             {m.donorSummary.top.length > 0 && (
               <>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  {/* Plain chips. These used to open a per-sector page whose
+                      member ranking was built from this very field — each
+                      member's three largest sectors only — so the page is gone
+                      and the label carries the sector's definition instead. */}
                   {m.donorSummary.top.map((t) => (
-                    <Link
+                    <span
                       key={t.industry}
-                      to={`/industries/${t.industry}`}
                       className="chip"
                       title={INDUSTRY_BY_ID[t.industry]?.blurb}
                     >
                       {INDUSTRY_BY_ID[t.industry]?.label ?? t.industry}
                       <span className="tnum text-ink-4">{usd(t.amount, { compact: true })}</span>
-                    </Link>
+                    </span>
                   ))}
                 </div>
                 {/* This was 11px --ink-4 tucked in at the end of the chip row

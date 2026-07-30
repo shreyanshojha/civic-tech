@@ -8,26 +8,40 @@
  * columns of qualifications — a good page for someone being paid to read it.
  * Most visitors are not. They arrive with one of three questions:
  *
- *     "who funds my representative?"   "what is in this bill?"   "who pays for
- *                                                                 my industry?"
+ *     "who funds my representative?"   "what is in this bill?"   "what is a
+ *                                                                 sector here?"
  *
  * So the page now leads with those three questions as three doors, and with the
- * search box. Everything that was here before is still here — the selection
- * rule, the coverage notes, the long disclaimer, the "what this does not show"
- * list — but folded, below, and reachable in one tap.
+ * search box. The coverage notes, the long disclaimer and the "what this does
+ * not show" list are all still here — folded, below, and reachable in one tap.
  *
  * Folding is not deleting. If you find yourself removing a caveat to make this
  * page shorter, stop: fold it instead.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT WAS CUT FROM THIS PAGE, AND WHY IT MUST NOT COME BACK
+ *
+ * "A few pairs worth a look" — six member-and-bill pairs, each with an overlap
+ * score — used to sit here, and it was the first number a first-time visitor
+ * met. The score is gone from the whole site. Three independent evaluations (a
+ * product manager, an ordinary voter, a working reporter) each concluded the
+ * score was the product's headline metric and was worthless, and this page's own
+ * guide said so out loud: a big match "is a bookmark, not a finding". A front
+ * page whose lead feature is a bookmark is a front page selling nothing.
+ *
+ * `featured.json` and `overlaps.json` are still written by the pipeline. Nothing
+ * reads them. The comparison with a real sample size is /patterns, which already
+ * has a door on this page.
  * ---------------------------------------------------------------------------
  */
 
 import { Link } from 'react-router-dom';
 import { INDUSTRY_BY_ID, PROJECT_TAGLINE, plainAmount, usd } from '@ftm/core';
-import { getBills, getFeaturedSet, getIndex, getLegislators } from '../lib/data';
+import { getBills, getIndex } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { useViewMode } from '../lib/view';
-import { CoverageNote, LongDisclaimer, OverlapScore } from '../components/Framing';
-import { ErrorState, IndustryChip, Loading, MemberAvatar, SectionTitle, Stat } from '../components/ui';
+import { CoverageNote, LongDisclaimer } from '../components/Framing';
+import { ErrorState, IndustryChip, Loading, SectionTitle, Stat } from '../components/ui';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { Fold } from '../components/ViewToggle';
 
@@ -62,8 +76,6 @@ function EntryCard({
 export default function Home() {
   const index = useAsync(getIndex, []);
   const bills = useAsync(getBills, []);
-  const legislators = useAsync(getLegislators, []);
-  const featured = useAsync(getFeaturedSet, []);
   const { isQuick } = useViewMode();
 
   if (index.error) return <ErrorState error={index.error} />;
@@ -76,33 +88,6 @@ export default function Home() {
   }
 
   const idx = index.data;
-  const legByBio = new Map((legislators.data ?? []).map((l) => [l.bioguideId, l]));
-  const billById = new Map((bills.data ?? []).map((b) => [b.id, b]));
-
-  /* ---- the featured set ------------------------------------------------
-     This list used to be `overlaps.json.slice(0, 6)` — the six highest raw
-     scores, with no diversification. That surfaced small-denominator artefacts
-     (a member with a tiny disclosed total scores high off a single cheque) and
-     the same bill six times, and it read to a first-time visitor as a ranking
-     of who is worst.
-
-     The export now writes `featured.json`: the same row shape, already filtered
-     and de-duplicated, carrying a `featureNote` that states the rule it used.
-     We render that note verbatim next to the list rather than paraphrasing it,
-     so the rule the reader is told is the rule that was actually applied.
-
-     `featured.json` is optional. An older bundle will not have it, in which case
-     `getFeaturedSet()` falls back to the raw overlap list — degraded, but working,
-     and labelled as unfiltered below rather than passed off as a curated set.  */
-  const allFeatured = (featured.data?.rows ?? []).filter(
-    (o) => billById.has(o.billId) && legByBio.has(o.bioguideId),
-  );
-  const topOverlaps = allFeatured.slice(0, isQuick ? 3 : 6);
-
-  // The pipeline's own words, rendered verbatim. Null on a fallback bundle, and
-  // the copy below then says there was no rule rather than inventing one.
-  const featureNote = featured.data?.note ?? null;
-  const listLoading = featured.loading;
 
   const recentBills = (bills.data ?? []).filter((b) => b.industries.length > 0).slice(0, isQuick ? 5 : 8);
 
@@ -162,8 +147,8 @@ export default function Home() {
             />
             <EntryCard
               to="/industries"
-              title="Follow a sector"
-              line="Pick an industry and see the money and the bills it touches."
+              title="See the sectors"
+              line="What each group of employers means, how much it gave, and how many bills it touches."
               icon={
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
                   <path d="M3 16.5h14" strokeLinecap="round" />
@@ -273,9 +258,9 @@ export default function Home() {
         <div>
           <SectionTitle>What you can see here</SectionTitle>
           <ul className="space-y-1.5 text-base leading-snug text-ink-2">
-            <li>· Which industries the money reported to a member came from, and how much.</li>
+            <li>· Who gave money to a member, by name, and how much.</li>
             <li>· Which industries a bill would affect, and why we think so.</li>
-            <li>· Where those two lists match.</li>
+            <li>· Whether a whole committee's money looks different from everyone else's.</li>
             <li>· A link to the government filing behind every number.</li>
           </ul>
         </div>
@@ -288,96 +273,6 @@ export default function Home() {
             <li>· A reason to skip reading the bill.</li>
           </ul>
         </div>
-      </section>
-
-      {/* ---- pairs worth a look ------------------------------------------- */}
-      <section className="py-7">
-        <SectionTitle note={<Link className="link" to="/bills">All bills →</Link>}>
-          A few pairs worth a look
-        </SectionTitle>
-        <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
-          In each pair, the industries a member's reported money came from are also industries the
-          bill would affect. That is often completely ordinary: members work on the industries in
-          their own area. Read these as questions, not answers.
-        </p>
-
-        {listLoading ? (
-          <Loading what="the list of member and bill pairs" rows={3} />
-        ) : topOverlaps.length === 0 ? (
-          <CoverageNote>
-            No pairs have been worked out yet. That happens when bills are loaded but campaign money
-            is not, or when no bill in the data has an industry tag. Run{' '}
-            <code className="mono">npm run pipeline</code> from the repository root to fill this in.
-          </CoverageNote>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {topOverlaps.map((o) => {
-              const member = legByBio.get(o.bioguideId)!;
-              const bill = billById.get(o.billId)!;
-              return (
-                <li key={`${o.billId}:${o.bioguideId}`} className="card-data p-4">
-                  <div className="flex items-start gap-3">
-                    <MemberAvatar src={member.imageUrl} name={member.name} size={44} />
-                    <div className="min-w-0 flex-1">
-                      <Link to={`/reps/${member.bioguideId}`} className="tap-24 block truncate text-base font-medium text-ink-0 hover:text-accent">
-                        {member.name}
-                      </Link>
-                      <div className="text-xs text-ink-4">
-                        {member.chamber === 'Senate' ? 'Sen.' : 'Rep.'} · {member.state}
-                        {member.district ? `-${member.district}` : ''}
-                      </div>
-                      <Link to={`/bills/${bill.id}`} className="tap-24 mt-1.5 block text-sm text-ink-2 hover:text-accent">
-                        <span className="mono text-ink-4">{bill.billType.toUpperCase()} {bill.billNumber}</span>{' '}
-                        {bill.title.length > 90 ? `${bill.title.slice(0, 90)}…` : bill.title}
-                      </Link>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <OverlapScore score={o.score} size="sm" showExplainer={false} plain={isQuick} />
-                  </div>
-                  {o.matches[0] && (
-                    <p className="mt-2 text-xs text-ink-3">
-                      Biggest shared industry:{' '}
-                      <Link className="link" to={`/industries/${o.matches[0].industry}`}>
-                        {INDUSTRY_BY_ID[o.matches[0].industry]?.label ?? o.matches[0].industry}
-                      </Link>{' '}
-                      · {plainAmount(o.matches[0].donorAmount)} disclosed
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {/* The selection rule, stated where the selection is shown. It is
-            folded rather than dropped: a reader who wants to know why these six
-            is one tap away, and a reader who does not is not made to read it
-            before they can see anything. */}
-        <Fold
-          className="mt-4"
-          open={!isQuick}
-          title="How these were picked (and why it is not a ranking)"
-        >
-          <div className="max-w-measure-wide text-sm leading-relaxed text-ink-2">
-            {featureNote ? (
-              <p>{featureNote}</p>
-            ) : (
-              <p>
-                This data bundle has no picked set, so the list above is simply the highest raw
-                scores in <code className="mono">overlaps.json</code>. A raw score favours members
-                with a small reported total, and can show the same bill several times.
-              </p>
-            )}
-            <p className="mt-2">
-              <strong className="font-semibold">This is not a ranking of members.</strong> No member
-              is being compared with any other. The order means nothing beyond the rule above, and a
-              member who is not on this list has not been cleared of anything — most of the data is
-              simply not on this page.{' '}
-              <Link className="link" to="/methodology">How the number is built →</Link>
-            </p>
-          </div>
-        </Fold>
       </section>
 
       {/* ---- recent bills ------------------------------------------------ */}
@@ -397,15 +292,15 @@ export default function Home() {
                     <span className="max-w-measure-wide text-base leading-snug text-ink-1 group-hover:text-accent">{b.title}</span>
                   </div>
                   {/* The percentage on these chips is the *classifier's* confidence
-                      that the bill touches the sector. It is not an overlap score,
-                      and eight inches above it "80%" means overlap score — so it
-                      carries its unit rather than sitting bare. */}
+                      that the bill touches the sector. It is the only percentage
+                      left on this page, and it still carries its unit in words so
+                      it cannot be read as a fact about a person or about money. */}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     {b.industries.slice(0, 4).map((i) => (
                       <span
                         key={i.industry}
                         className="chip"
-                        title={`This tool tagged the bill ${INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}, and is ${Math.round(i.confidence * 100)}% sure of that tag. It is not an overlap score.`}
+                        title={`This tool tagged the bill ${INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}, and is ${Math.round(i.confidence * 100)}% sure of that tag. It says nothing about any member.`}
                       >
                         {/* One flex child, not two: a chip whose label wraps would
                             otherwise strand the number at the far right of the
@@ -424,9 +319,16 @@ export default function Home() {
         )}
       </section>
 
-      {/* ---- sectors ----------------------------------------------------- */}
+      {/* ---- sectors -----------------------------------------------------
+          These chips are plain labels now, not links. Each sector used to have
+          its own page; those pages ranked members using only each member's three
+          largest donor sectors, which is about an eighth of the money, so they
+          are gone. Hover or focus a chip for what the group means; the Sectors
+          page has the figures. */}
       <section className="border-t border-line py-7">
-        <SectionTitle note={<Link className="link" to="/industries">All sectors →</Link>}>Pick a sector</SectionTitle>
+        <SectionTitle note={<Link className="link" to="/industries">All sectors, with figures →</Link>}>
+          The sectors money is sorted into
+        </SectionTitle>
         <div className="flex flex-wrap gap-1.5">
           {Object.values(INDUSTRY_BY_ID)
             .filter((i) => i.id !== 'other')
@@ -474,9 +376,13 @@ export default function Home() {
               <dt className="font-semibold text-ink-1">Sector</dt>
               <dd>A rough group of employers, like “Banking &amp; Finance”. These groups are built from what donors write on their own filings, so they are approximate — and a sector is a label on a donor, never an entity that gave anything. Companies cannot give to federal candidates at all.</dd>
             </div>
+            {/* This slot used to define "Overlap" — the member-and-bill match
+                number. No page shows that number any more, and a glossary entry
+                for a thing the reader will never meet is clutter. The committee
+                comparison is the thing they will meet instead. */}
             <div>
-              <dt className="font-semibold text-ink-1">Overlap</dt>
-              <dd>How much of a member’s reported money came from industries a bill would affect. It is a share of money, nothing more.</dd>
+              <dt className="font-semibold text-ink-1">Committee comparison</dt>
+              <dd>The members on one committee, next to the members of the same chamber who are not on it. It asks whether the two groups’ money looks different. A group is big enough to test; one person is not.</dd>
             </div>
             <div>
               <dt className="font-semibold text-ink-1">Cycle</dt>

@@ -10,9 +10,14 @@
  *    saturated red or blue for exactly this reason. A reader must not be able to
  *    tell at a glance "which side" a page is about.
  *
- * 2. NO ALARM COLOURS ON SCORES. A high overlap score is not "bad" and must not
- *    be rendered in red. All overlap magnitudes use one single-hue ink ramp, so
- *    the eye reads "more / less", never "good / bad".
+ * 2. NO ALARM COLOURS ON A MAGNITUDE. A large figure about a member is not "bad"
+ *    and must not be rendered in red. Every bar on this site encodes size with
+ *    length alone, filled from the neutral ink ramp, so the eye reads
+ *    "more / less" and never "good / bad". (The four `.ramp-0…3` fills that used
+ *    to serve the member-and-bill overlap score are gone with that score — it was
+ *    cut from every page after three independent evaluations found it worthless
+ *    and the site's own guide called it a bookmark, not a finding. The rule
+ *    outlives it and applies to every bar that remains.)
  *
  * 3. DATA-FORWARD, NOT TABLOID. Numbers get the weight; the chrome recedes.
  *    No exclamation, no gradients, no drop shadows on data.
@@ -170,13 +175,6 @@ a { color: inherit; }
     scroll-behavior: auto !important;
   }
 }
-
-/* The one ramp used to show overlap magnitude. Single hue, varying only in
-   weight — deliberately not a red/green "bad/good" scale. */
-.ramp-0 { background: var(--ink-6); }
-.ramp-1 { background: var(--ink-5); }
-.ramp-2 { background: var(--ink-3); }
-.ramp-3 { background: var(--ink-1); }
 
 @layer components {
   .card {
@@ -393,24 +391,15 @@ a { color: inherit; }
   /* Row rhythm for long lists and tables. Zebra is a wash of the well colour
      rather than a tint of the accent, so it never reads as a state. */
   .rows > * + * { border-top: 1px solid var(--line); }
-  .zebra > *:nth-child(even) { background: color-mix(in srgb, var(--ink-7) 55%, transparent); }
   .rows > *:hover { background: color-mix(in srgb, var(--ink-7) 80%, transparent); }
 
-  /* Sticky table head, docked under the sticky page header rather than under
-     the top of the viewport.
-
-     Only applied from `lg` up (see Spending.tsx). Below that the table sits in
-     an `overflow-x-auto` wrapper, and a wrapper that scrolls on one axis is a
-     scroll container on both — so a sticky <th> inside it would offset from the
-     wrapper instead of from the page and land in the middle of the rows. A
-     header stuck to the wrong thing is worse than no sticky header. */
-  .thead-sticky th {
-    position: sticky;
-    top: var(--header-h);
-    z-index: 10;
-    background: var(--paper);
-    border-bottom: 1px solid var(--edge);
-  }
+  /* `.zebra` and `.thead-sticky` lived here and are gone: the federal-spending
+     page was their only caller and it was deleted. Keeping the one lesson, in
+     case a long table comes back — a sticky <th> must NOT be used inside an
+     `overflow-x-auto` wrapper. A wrapper that scrolls on one axis is a scroll
+     container on both, so the <th> offsets from the wrapper rather than from the
+     page and parks in the middle of the rows. That is why the rule was gated to
+     `lg` and up. A header stuck to the wrong thing is worse than none. */
 
   /* Empty and error states. A dashed well says "nothing here yet" without
      borrowing the caveat's amber, which is reserved for data-gap meaning. */

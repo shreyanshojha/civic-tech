@@ -4,44 +4,35 @@
  * Written for a reader who does not believe it. Everything on this page is
  * either (a) pulled live out of the generated bundle, so it describes THIS
  * dataset rather than an idealised one, or (b) imported from @ftm/core so the
- * page cannot drift from the code that actually runs. The overlap formula and
- * the score explainer are imported, never retyped.
+ * page cannot drift from the code that actually runs.
+ *
+ * ---------------------------------------------------------------------------
+ * THE HAND-WORKED OVERLAP EXAMPLE WAS CUT FROM THIS PAGE.
+ *
+ * Two sections went: "Step 4 — the overlap score, exactly" (the formula, the
+ * score explainer, and five notes on what the score does not use) and "Step 5 —
+ * one score, worked out by hand" (an invented member, an invented bill, the
+ * arithmetic in a <pre>, and a rendered score at the end). They documented the
+ * member×bill overlap percentage, and no page on this site shows that percentage
+ * any more — three independent evaluations found it was the headline metric and
+ * was worthless, and the site's own reading guide had already called it "a
+ * bookmark, not a finding".
+ *
+ * The arithmetic is still real and still runs: `computeOverlap` in @ftm/core is
+ * called by the export step and `overlaps.json` still ships. Documenting the
+ * derivation of a number a reader can never meet is not honesty, it is noise, so
+ * what stands in its place is a short statement that the file exists and is not
+ * rendered, plus a full description of the comparison that IS rendered — the
+ * committee cohort test on /patterns.
+ * ---------------------------------------------------------------------------
  */
 
 import { Link } from 'react-router-dom';
-import { OVERLAP_FORMULA, SCORE_EXPLAINER, usd } from '@ftm/core';
-import { getIndex } from '../lib/data';
+import { PATTERN_THRESHOLDS, usd } from '@ftm/core';
+import { getIndex, getPatterns } from '../lib/data';
 import { useAsync } from '../lib/hooks';
-import { CoverageNote, FramingNote, OverlapScore } from '../components/Framing';
+import { CoverageNote, FramingNote } from '../components/Framing';
 import { Empty, ErrorState, Loading, SectionTitle, Stat } from '../components/ui';
-
-/**
- * The worked example.
- *
- * Deliberately synthetic and deliberately round, so a reader can reproduce
- * every digit with a calculator and no data files. The numbers are chosen to
- * exercise the three parts of the formula people get wrong: unclassified money
- * is excluded from the numerator but stays in the denominator; a donor sector
- * the bill does not touch contributes nothing; and a bill tag below the 0.25
- * confidence floor is dropped before the weights are computed.
- */
-const EXAMPLE = {
-  memberTotal: 1_000_000,
-  donors: [
-    { label: 'Banking & Finance', amount: 250_000, share: 0.25 },
-    { label: 'Insurance', amount: 100_000, share: 0.1 },
-    { label: 'Real Estate', amount: 50_000, share: 0.05 },
-  ],
-  unclassified: 600_000,
-  billTags: [
-    { label: 'Banking & Finance', confidence: 0.8, kept: true },
-    { label: 'Insurance', confidence: 0.4, kept: true },
-    { label: 'Technology', confidence: 0.2, kept: false },
-  ],
-};
-
-const EXAMPLE_CONF_SUM = 0.8 + 0.4;
-const EXAMPLE_SCORE = 0.25 * (0.8 / EXAMPLE_CONF_SUM) + 0.1 * (0.4 / EXAMPLE_CONF_SUM);
 
 function Source({
   name, keyed, what, url,
@@ -61,6 +52,10 @@ function Source({
 
 export default function Methodology() {
   const { data: idx, error, loading } = useAsync(getIndex, []);
+  // Read so the committee-comparison section can quote this bundle's own counts
+  // rather than describing the code in the abstract. A bundle with no patterns
+  // file simply omits that line; it is not an error on this page.
+  const patterns = useAsync(getPatterns, []);
 
   if (error) return <ErrorState error={error} />;
 
@@ -73,8 +68,8 @@ export default function Methodology() {
       <h1 className="text-xl font-semibold text-ink-0">How the numbers work</h1>
       <p className="mt-1 max-w-measure text-base leading-relaxed text-ink-3">
         Every figure on this site is derived from a government file that anybody can download. This
-        page describes each step, names the file it came from, and works one score out by hand so the
-        arithmetic can be checked rather than trusted.
+        page describes each step, names the file it came from, and states every threshold the code
+        uses, so the working can be checked rather than trusted.
       </p>
       <FramingNote className="mt-2 max-w-measure-wide" />
 
@@ -104,8 +99,11 @@ export default function Methodology() {
                 value={(idx.counts.contributions ?? 0).toLocaleString()}
                 sub={`${usd(idx.counts.contributionDollars ?? 0, { compact: true })} · FEC cycle ${idx.cycle}`}
               />
-              <Stat label="Overlaps computed" value={(idx.counts.overlaps ?? 0).toLocaleString()} sub="Member–bill pairs with at least one shared sector" />
-              <Stat label="Federal awards" value={(idx.counts.awards ?? 0).toLocaleString()} sub={<Link className="link" to="/spending">Federal spending →</Link>} />
+              <Stat
+                label="Federal awards"
+                value={(idx.counts.awards ?? 0).toLocaleString()}
+                sub="Contracts and grants. Shown per district on a member's page, as background only."
+              />
               <Stat label="Committee seats" value={(idx.counts.committeeSeats ?? 0).toLocaleString()} sub="Used to decide who 'touched' a bill" />
               <Stat
                 label="Roll-call votes"
@@ -284,9 +282,8 @@ export default function Methodology() {
               than keyword-matching a bill title. The policy area contributes a moderate-confidence
               signal and the subject terms sharpen it — “Health” tells you a bill touches health, but
               not whether it lands on hospitals, insurers or drug manufacturers, so the confidences
-              on this path are deliberately conservative. Bills with no usable metadata get no tags
-              and no overlap score at all, which for ceremonial resolutions and naming bills is the
-              correct answer.
+              on this path are deliberately conservative. Bills with no usable metadata get no tags at
+              all, which for ceremonial resolutions and naming bills is the correct answer.
             </p>
           </div>
           <div className="card p-4">
@@ -345,151 +342,140 @@ export default function Methodology() {
         </p>
       </section>
 
-      {/* ---- the formula --------------------------------------------------- */}
+      {/* ---- the committee comparison, which is what the site actually shows
+          This replaced two sections on the overlap score: the formula, and one
+          score worked out by hand. See the file header. Every threshold quoted
+          here is imported from PATTERN_THRESHOLDS or read out of the generated
+          patterns file, so this description cannot drift from the code. */}
       <section className="mt-10">
-        <SectionTitle>Step 4 — the overlap score, exactly</SectionTitle>
-        <div className="card p-4">
-          <div className="label mb-1.5">The formula, imported from the code that computes it</div>
-          <p className="mono text-xs leading-relaxed text-ink-2">{OVERLAP_FORMULA}</p>
-          {idx && idx.overlapFormula !== OVERLAP_FORMULA && (
-            <p className="mt-2 text-xs text-ink-4">
-              The bundle you are reading was generated with a different revision of this formula:{' '}
-              <span className="mono">{idx.overlapFormula}</span>
-            </p>
-          )}
-        </div>
-
-        <dl className="mt-4 max-w-3xl space-y-3 text-sm leading-relaxed text-ink-2">
-          <div>
-            <dt className="label">What it is</dt>
-            <dd>{SCORE_EXPLAINER.what}</dd>
-          </div>
-          <div>
-            <dt className="label">What it is not</dt>
-            <dd>{SCORE_EXPLAINER.whatItIsNot}</dd>
-          </div>
-          <div>
-            <dt className="label">How to use it</dt>
-            <dd>{SCORE_EXPLAINER.howToUse}</dd>
-          </div>
-        </dl>
-
-        <ul className="mt-4 max-w-3xl space-y-1.5 text-sm leading-relaxed text-ink-3">
-          <li>· Money the pipeline could not attribute to any sector is excluded from the numerator but stays in the member's total, so unattributed money pushes a score down rather than up.</li>
-          <li>· Bill tags below a confidence of 0.25 are dropped before the weights are computed, so a barely-there tag cannot swing a score.</li>
-          <li>· The member's vote is not an input. Somebody who voted against every interest that funded them scores identically.</li>
-          <li>· Whether the bill helps or harms the sector is not an input either. The score has no direction.</li>
-          <li>· Every result stores the unattributed share alongside it, so a score built on thin attribution can be discounted on sight.</li>
-        </ul>
-      </section>
-
-      {/* ---- worked example ------------------------------------------------ */}
-      <section className="mt-10">
-        <SectionTitle note="Check this with a calculator">Step 5 — one score, worked out by hand</SectionTitle>
-        <p className="mb-4 max-w-measure-wide text-sm leading-relaxed text-ink-2">
-          An invented member and an invented bill, with round numbers, so every digit below can be
-          reproduced without downloading anything.
+        <SectionTitle note={<Link className="link" to="/patterns">See the comparisons →</Link>}>
+          Step 4 — the committee comparison, exactly
+        </SectionTitle>
+        <p className="max-w-measure-wide text-sm leading-relaxed text-ink-2">
+          This is the only comparison the site puts on screen. It is also the only one with a group on
+          both sides. Take one committee and one sector. Take every member of that committee. Take
+          every member of the same chamber who is not on it. Then compare the share of each member's
+          traced money that came from that sector. One member's share is a sample of one and cannot be
+          tested. Fifty against four hundred can be.
         </p>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="card p-4">
-            <div className="label mb-2">The member's disclosed itemized money</div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-2xs uppercase tracking-wide text-ink-4">
-                  <th scope="col" className="pb-1 font-semibold">Sector</th>
-                  <th scope="col" className="pb-1 text-right font-semibold">Amount</th>
-                  <th scope="col" className="pb-1 text-right font-semibold">Share D</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {EXAMPLE.donors.map((d) => (
-                  <tr key={d.label}>
-                    <td className="py-1.5 text-ink-2">{d.label}</td>
-                    <td className="tnum py-1.5 text-right">{usd(d.amount)}</td>
-                    <td className="tnum py-1.5 text-right">{d.share.toFixed(2)}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td className="py-1.5 text-ink-4">Could not be attributed</td>
-                  <td className="tnum py-1.5 text-right text-ink-4">{usd(EXAMPLE.unclassified)}</td>
-                  <td className="tnum py-1.5 text-right text-ink-4">0.60</td>
-                </tr>
-                <tr>
-                  <td className="py-1.5 font-semibold text-ink-0">Total itemized</td>
-                  <td className="tnum py-1.5 text-right font-semibold text-ink-0">{usd(EXAMPLE.memberTotal)}</td>
-                  <td className="tnum py-1.5 text-right font-semibold text-ink-0">1.00</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="card p-4">
-            <div className="label mb-2">The bill's sector tags</div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-2xs uppercase tracking-wide text-ink-4">
-                  <th scope="col" className="pb-1 font-semibold">Sector</th>
-                  <th scope="col" className="pb-1 text-right font-semibold">Confidence C</th>
-                  <th scope="col" className="pb-1 text-right font-semibold">Weight W</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {EXAMPLE.billTags.map((t) => (
-                  <tr key={t.label} className={t.kept ? '' : 'text-ink-4'}>
-                    <td className="py-1.5">{t.label}</td>
-                    <td className="tnum py-1.5 text-right">{t.confidence.toFixed(2)}</td>
-                    <td className="tnum py-1.5 text-right">
-                      {t.kept ? (t.confidence / EXAMPLE_CONF_SUM).toFixed(4) : 'dropped'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-2 text-xs leading-relaxed text-ink-4">
-              Technology is dropped because 0.20 is below the 0.25 floor. The weights are computed
-              from what survives: ΣC = 0.80 + 0.40 = 1.20.
+        <ol className="mt-4 max-w-3xl space-y-3">
+          <li className="card p-4">
+            <div className="label mb-1.5">1. Who is in, and who is left out</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              A member with under{' '}
+              <span className="tnum">${PATTERN_THRESHOLDS.minMemberTotal.toLocaleString()}</span> of
+              reported money is dropped from both groups. At that size, one cheque moves their share by
+              tens of percentage points. A committee then needs at least{' '}
+              <span className="tnum">{PATTERN_THRESHOLDS.minCohortSize}</span> members above that
+              floor, and the comparison group at least{' '}
+              <span className="tnum">{PATTERN_THRESHOLDS.minBaselineSize}</span>, or the pair is not
+              tested at all. Not tested is reported as its own outcome — it is not a pattern that
+              failed.
             </p>
-          </div>
-        </div>
-
-        <div className="card mt-4 p-4">
-          <div className="label mb-2">The arithmetic</div>
-          <pre className="mono overflow-x-auto whitespace-pre-wrap text-xs leading-relaxed text-ink-2">
-{`Banking & Finance   D = 0.25   W = 0.80 / 1.20 = 0.666666…   D × W = 0.166666…
-Insurance           D = 0.10   W = 0.40 / 1.20 = 0.333333…   D × W = 0.033333…
-Real Estate         D = 0.05   the bill has no real-estate tag   D × W = 0
-Technology          tag dropped below the 0.25 floor           D × W = 0
-
-score = 0.166666… + 0.033333… = 0.20`}
-          </pre>
-          <p className="mt-3 max-w-measure-wide text-sm leading-relaxed text-ink-3">
-            So the score is 20%. Read it as: weighting sectors by how central they are to this bill,
-            about a fifth of this member's disclosed itemized money came from those sectors. Note
-            what the $600,000 of unattributable money did — it stayed in the denominator, so it pulled
-            the score down. Had all of it been attributable to banking, the score would have been far
-            higher; had none of it been attributable, the score would be lower still. A score built on
-            a member whose money is largely unattributed is a weak score, which is why the
-            unattributed share is reported next to every one of them.
+          </li>
+          <li className="card p-4">
+            <div className="label mb-1.5">2. The test itself: shuffle the labels</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              A permutation test, not a t-test. These share distributions are mostly zero and heavily
+              skewed, so the bell curve a t-test assumes is plainly false. Instead the code shuffles
+              which members count as being on the committee, ten thousand times over. Then it counts
+              how often chance alone produces a gap this big. The shuffle uses a fixed seed, so the
+              figure a reader is looking at does not change from one build to the next.
+            </p>
+          </li>
+          <li className="card p-4">
+            <div className="label mb-1.5">3. The correction for the size of the search</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              Every full committee is tested against every sector. That is over a thousand
+              comparisons. At the usual one-in-twenty cutoff, chance alone hands you about fifty
+              “findings”, and each one would survive a reader's own scrutiny. So a Benjamini–Hochberg
+              false-discovery-rate correction is applied across every pair tested, at{' '}
+              <span className="tnum">{(PATTERN_THRESHOLDS.maxQValue * 100).toFixed(0)}%</span>: of the
+              comparisons published as worth a look, about that share are expected to be chance. The
+              denominator is printed in the first sentence of the page for the same reason.
+            </p>
+          </li>
+          <li className="card p-4">
+            <div className="label mb-1.5">4. The robustness checks, each shown next to the gap</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              A gap has to survive every one of these to reach the shortlist. Take out the five
+              highest members: it must still be above{' '}
+              <span className="tnum">{PATTERN_THRESHOLDS.minTrimmedRatio.toFixed(1)}×</span>, so it is
+              not five people. At least half the committee must sit above the typical non-member, so it
+              describes the group and not a corner of it. The ten largest members must come from at
+              least <span className="tnum">{PATTERN_THRESHOLDS.minDistinctStatesInTopTen}</span>{' '}
+              different states, so it is not one state's industry. It must hold in both parties. And
+              both groups must place a similar share of their money in some sector, so the gap is not
+              an artefact of one group simply being easier to attribute.
+            </p>
+          </li>
+          <li className="card p-4">
+            <div className="label mb-1.5">5. The failures stay on the page</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              A comparison that fails a check is still listed, marked, with the checks it failed. A
+              page showing only survivors has hidden its own base rate, which would make the survivors
+              look far stronger than they are.
+            </p>
+          </li>
+        </ol>
+        {patterns.data && (
+          <p className="mt-3 max-w-measure-wide text-xs leading-relaxed text-ink-4">
+            In the bundle you are reading:{' '}
+            <span className="tnum">{patterns.data.meta.pairsTested.toLocaleString()}</span> comparisons
+            were tested,{' '}
+            <span className="tnum">{patterns.data.meta.verdictCounts['worth-a-look'].toLocaleString()}</span>{' '}
+            passed every check, and{' '}
+            <span className="tnum">{patterns.data.meta.pairsSkippedTooSmall.toLocaleString()}</span>{' '}
+            pairs were too small to test. Permutations per test:{' '}
+            <span className="tnum">{patterns.data.meta.permutationIterations.toLocaleString()}</span>.
           </p>
-          <div className="mt-4 max-w-sm">
-            <OverlapScore score={EXAMPLE_SCORE} size="md" />
-          </div>
-        </div>
+        )}
+        <ul className="mt-4 max-w-3xl space-y-1.5 text-sm leading-relaxed text-ink-3">
+          <li>· No member's vote is an input. Nothing on this site uses a vote in any calculation.</li>
+          <li>· Whether a bill or a sector was helped or harmed is not an input either. There is no direction in any of this.</li>
+          <li>· Money the pipeline could not attribute to a sector is never guessed at. It is reported as its own figure and left out of every share.</li>
+          <li>· The comparison cannot say which came first — a member joining a committee, or the money arriving. The data fits both.</li>
+        </ul>
       </section>
 
       {/* ---- who counts as involved ---------------------------------------- */}
       <section className="mt-10">
-        <SectionTitle>Step 6 — who counts as having “touched” a bill</SectionTitle>
+        <SectionTitle>Step 5 — who counts as having “touched” a bill</SectionTitle>
         <p className="max-w-measure-wide text-sm leading-relaxed text-ink-2">
-          A score is computed for the bill's sponsor, for each of its cosponsors, and for every member
-          sitting on a committee the bill was referred to. Committee membership is included because
-          jurisdiction is where most legislative influence actually lives, and excluding it would miss
-          the members most likely to shape a bill. It also means a member can appear against a bill
-          they have never mentioned — appearing in this list is not a claim that somebody acted on a
-          bill, only that they were in a position to. Pairs with no shared sector at all are not
-          stored.
+          A bill's sponsor, each of its cosponsors, and every member sitting on a committee the bill
+          was referred to. Committee membership is included because jurisdiction is where most
+          legislative influence actually lives, and excluding it would miss the members most likely to
+          shape a bill. It also means a member can be counted against a bill they have never
+          mentioned — being on that list is not a claim that somebody acted on a bill, only that they
+          were in a position to.
         </p>
+        <p className="mt-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
+          This is used to build the bill's own record of sponsors and committees. It used to feed one
+          more thing: a percentage, per member per bill, of how much of that member's reported money
+          came from sectors the bill would affect.
+        </p>
+
+        {/* Somebody will open the data folder, find overlaps.json, and wonder
+            why nothing renders it. Saying so here costs a paragraph and prevents
+            the obvious wrong conclusion, which is that a page is broken. */}
+        <div className="mt-3 card p-4">
+          <div className="label mb-1.5">The number this site used to show, and no longer does</div>
+          <p className="max-w-measure-wide text-sm leading-relaxed text-ink-3">
+            That percentage is still computed by the pipeline, and{' '}
+            <code className="mono">overlaps.json</code> is still written into the data folder. No page
+            renders it. It was the biggest number on the site and it could not bear the weight. A
+            member from a farming area takes farm money and works on farm bills. So the number was
+            large for ordinary reasons, and it was read as a verdict anyway. The site's own reading
+            guide called it a bookmark rather than a finding. That is not enough to earn the top of a
+            named person's page.
+          </p>
+          <p className="mt-2 max-w-measure-wide text-sm leading-relaxed text-ink-3">
+            What replaced it is the committee comparison above: the same kind of question asked about
+            a group, where the answer can be tested and every way it could be wrong is measured and
+            printed beside it.{' '}
+            <Link className="link" to="/how-to-read">How to read what is left →</Link>
+          </p>
+        </div>
       </section>
 
       {/* ---- reproducing --------------------------------------------------- */}
@@ -499,8 +485,8 @@ score = 0.166666… + 0.033333… = 0.20`}
           Everything shown is computed at build time and shipped as plain JSON files. There is no
           query API, no database connection from the browser, and no server involved in rendering any
           page. From a clone of the repository, <code className="mono">npm run pipeline</code> fetches
-          the sources, classifies, computes every overlap and writes the bundle — no keys required for
-          a first run. The exported files sit in{' '}
+          the sources, classifies, runs the committee comparisons and writes the bundle — no keys
+          required for a first run. The exported files sit in{' '}
           <code className="mono">apps/web/public/data</code> and can be inspected directly with any
           JSON viewer.
         </p>
@@ -509,10 +495,10 @@ score = 0.166666… + 0.033333… = 0.20`}
             a reference to something they were not given. The property that
             matters to a reader is the one stated here. */}
         <p className="mt-3 max-w-measure-wide text-sm leading-relaxed text-ink-3">
-          The overlap formula, the sector taxonomy and the framing language each live in exactly one
-          place in the code, and this page imports the formula and the explainer from that place
-          rather than restating them — so the arithmetic described here cannot quietly fall out of
-          step with the arithmetic that produced the numbers.
+          The sector taxonomy, the thresholds behind the committee comparison and the framing language
+          each live in exactly one place in the code, and this page imports the thresholds from that
+          place rather than restating them — so the description here cannot quietly fall out of step
+          with the code that produced the numbers.
         </p>
         <p className="mt-4 text-sm text-ink-4">
           <Link className="link" to="/limitations">What this tool cannot do →</Link> ·{' '}

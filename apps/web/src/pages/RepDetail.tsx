@@ -4,19 +4,39 @@
  * The page is ordered by how much the reader can trust each block:
  *   1. Who they are — straight from the Congress.gov record.
  *   2. What was disclosed to the FEC — a filing, not an inference.
- *   3. What this tool computed on top of that — the overlap scores, which are
- *      fenced by the disclaimer and never rendered as a bare number.
+ *   3. How they voted, where the bundle has roll calls — also a record.
  *   4. Federal spending in the district — context only, and labelled as such.
  *
  * ---------------------------------------------------------------------------
- * WHAT CHANGED, AND WHAT DID NOT
+ * THE OVERLAP SCORE WAS CUT FROM THIS PAGE. DO NOT PUT IT BACK.
+ *
+ * "Bills they worked on, next to their donors" used to be step 3: a list of
+ * bills, each with a percentage of this member's money that came from sectors
+ * the bill would affect, a "what this means" block, and a share-image button.
+ * All of it is gone, along with the "Biggest overlap with a bill" card in the
+ * at-a-glance row and the score that sat beside each roll-call vote.
+ *
+ * Three independent evaluations of the live site — a product manager, an
+ * ordinary voter and a working reporter — concluded separately that the score
+ * was the product's headline metric and was worthless. The site's own
+ * /how-to-read page had already said it: a big match "is a bookmark, not a
+ * finding". A number that can only tell a reader to go and read something else
+ * does not earn the largest block on a named person's page.
+ *
+ * What is left on this page is all record, not inference: who gave by name, the
+ * sector breakdown with its two gaps accounted for, the check that can answer
+ * "did they take money from this sector", the votes, and the district awards.
+ * `overlaps` is still in the member's data file. Nothing on this page reads it.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT CHANGED BEFORE THAT, AND WHAT DID NOT
  *
  * The order above is right and is unchanged. What changed is that the page used
  * to open with three stat blocks, a sector bar chart, two amber coverage notes
  * and a donor table before a reader got to a single sentence they could act on.
- * There is now an "at a glance" block at the top — the total in plain words,
- * the three biggest sectors as bars, the single biggest overlap — and the rest
- * of the page folds underneath it.
+ * There is now an "at a glance" block at the top — the total in plain words and
+ * the three biggest sectors as bars — and the rest of the page folds underneath
+ * it.
  *
  * The names now come BEFORE the sector labels. A first-time reader was given her
  * own congressman's page and the only thing on it that meant anything to her was
@@ -41,74 +61,19 @@
 import { useId, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  INDUSTRIES, INDUSTRY_BY_ID, billLabel, describeOverlap, donorDisplayName, isNoEmployerAggregate,
+  INDUSTRIES, INDUSTRY_BY_ID, donorDisplayName, isNoEmployerAggregate,
   plainAmount, plainShare, shortDate, usd,
 } from '@ftm/core';
 import type { IndustryId } from '@ftm/core';
 import { getIndex, getMemberDetail } from '../lib/data';
-import type { BillSummary, DonorProfile } from '../lib/data';
+import type { DonorProfile } from '../lib/data';
 import { useAsync } from '../lib/hooks';
 import { useViewMode } from '../lib/view';
-import {
-  CoverageNote, DataLimit, FramingNote, OverlapScore, ReportProblemLink, SourceLink,
-  bandNoteFor, distinctBands,
-} from '../components/Framing';
+import { CoverageNote, DataLimit, ReportProblemLink, SourceLink } from '../components/Framing';
 import { placesLine, seatLine as seatLineFor } from '../lib/seat';
-import { WhatThisMeans } from '../components/WhatThisMeans';
-import { Empty, ErrorState, IndustryBars, Loading, MemberAvatar, MethodTag, PartyTag, SectionTitle, Stat } from '../components/ui';
-import { ShareCardButton } from '../components/ShareCard';
-import { shareEligibility, type ShareCardFinding } from '../lib/sharecard';
+import { Empty, ErrorState, IndustryBars, Loading, MemberAvatar, PartyTag, SectionTitle, Stat } from '../components/ui';
 import { Fold, ViewToggle } from '../components/ViewToggle';
 import { Term } from '../components/Glossary';
-
-/**
- * The member's relationship to one bill.
- *
- * The bill record names the sponsor, so that case is certain. It does not carry
- * the cosponsor list in the member bundle, so the other two possibilities —
- * cosponsor, or a seat on a committee of jurisdiction — are reported as the
- * disjunction they actually are. Picking the more eye-catching of the two would
- * be a guess dressed as a fact, and the share card repeats this string.
- */
-function roleFor(bill: { sponsorBioguideId?: string } | null | undefined, bioguideId: string): string {
-  return bill?.sponsorBioguideId === bioguideId ? 'Sponsor' : 'Cosponsor or committee member';
-}
-
-/**
- * The share-card finding for one overlap row. Extracted so the row and the
- * one-per-list refusal count are computed from the same object rather than from
- * two copies that could drift.
- */
-interface MemberCardContext {
-  bioguideId: string;
-  memberName: string;
-  memberSubtitle: string;
-  cycle: number | null;
-  totalDisclosed: number | null;
-}
-
-function findingFor(
-  o: { billId: string; score: number; matches: { industry: IndustryId; donorAmount: number }[] },
-  bill: BillSummary | null | undefined,
-  ctx: MemberCardContext,
-): ShareCardFinding {
-  const top = o.matches[0] ?? null;
-  return {
-    memberName: ctx.memberName,
-    memberSubtitle: ctx.memberSubtitle,
-    cycle: ctx.cycle,
-    totalDisclosed: ctx.totalDisclosed,
-    billLabel: bill ? billLabel(bill.billType, bill.billNumber) : o.billId,
-    billTitle: bill?.title ?? '',
-    topIndustryLabel: top ? (INDUSTRY_BY_ID[top.industry]?.label ?? top.industry) : null,
-    topIndustryAmount: top?.donorAmount ?? null,
-    score: o.score,
-    role: roleFor(bill, ctx.bioguideId),
-    classificationMethod: bill?.classificationMethod ?? null,
-    isCeremonial: (bill?.industries?.length ?? 0) === 0,
-    topIndustryConfidence: bill?.industries?.[0]?.confidence ?? null,
-  };
-}
 
 const DONOR_KIND_LABEL: Record<string, string> = {
   committee: 'PAC / committee',
@@ -179,8 +144,11 @@ function NamedDonorRows({ rows }: { rows: DonorRow[] }) {
               <span className="tnum shrink-0 font-medium text-ink-0">{usd(d.amount)}</span>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              {/* A plain chip, not a link. Each sector used to have a page;
+                  it ranked members off their three largest donor sectors only,
+                  so it is gone. The sector's definition is on the chip's title. */}
               {placed ? (
-                <Link className="chip hover:text-accent" to={`/industries/${d.industry}`}>{label}</Link>
+                <span className="chip" title={INDUSTRY_BY_ID[d.industry]?.blurb}>{label}</span>
               ) : (
                 <span className="chip">Not placed</span>
               )}
@@ -286,9 +254,12 @@ function SectorGlance({
         return (
           <li key={r.industry}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-              <Link className="text-base font-medium text-ink-1 hover:text-accent" to={`/industries/${r.industry}`}>
+              <span
+                className="text-base font-medium text-ink-1"
+                title={INDUSTRY_BY_ID[r.industry as keyof typeof INDUSTRY_BY_ID]?.blurb}
+              >
                 {label}
-              </Link>
+              </span>
               <span className="tnum text-sm text-ink-2">
                 {plainAmount(r.amount)}{' '}
                 <span className="text-xs text-ink-3">— {plainShare(r.share)}</span>
@@ -408,7 +379,7 @@ function SectorCheck({ profile, memberName }: { profile: DonorProfile; memberNam
     if (row && row.amount > 0) {
       answer = (
         <p className="text-md leading-snug text-ink-0">
-          <Link className="font-semibold hover:text-accent" to={`/industries/${sectorId}`}>{label}</Link>{' '}
+          <span className="font-semibold" title={meta?.blurb}>{label}</span>{' '}
           — <span className="tnum font-semibold">{usd(row.amount)}</span> reported{' '}
           <span className="tnum text-ink-2">({(row.share * 100).toFixed(1)}% of their money)</span>
         </p>
@@ -419,7 +390,7 @@ function SectorCheck({ profile, memberName }: { profile: DonorProfile; memberNam
       answer = (
         <>
           <p className="text-md leading-snug text-ink-0">
-            <Link className="font-semibold hover:text-accent" to={`/industries/${sectorId}`}>{label}</Link>{' '}
+            <span className="font-semibold" title={meta?.blurb}>{label}</span>{' '}
             — <span className="font-semibold">nothing from this sector appears in the money we
             could trace.</span>
           </p>
@@ -449,7 +420,7 @@ function SectorCheck({ profile, memberName }: { profile: DonorProfile; memberNam
       answer = (
         <>
           <p className="text-md leading-snug text-ink-0">
-            <Link className="font-semibold hover:text-accent" to={`/industries/${sectorId}`}>{label}</Link>{' '}
+            <span className="font-semibold" title={meta?.blurb}>{label}</span>{' '}
             — <span className="font-semibold">we could not tell.</span> None of the money we placed
             came from this sector.
           </p>
@@ -539,12 +510,12 @@ export default function RepDetail() {
   if (loading || !data) {
     return (
       <div className="mx-auto max-w-content px-4">
-        <Loading what="this member: their money, and the bills they worked on" />
+        <Loading what="this member: their money, their votes, and their district" />
       </div>
     );
   }
 
-  const { member, donorProfile, topDonors, overlaps, votes, districtAwards } = data;
+  const { member, donorProfile, topDonors, votes, districtAwards } = data;
 
   const isSenator = member.chamber === 'Senate';
   const districtStr = member.district === undefined ? '' : String(member.district);
@@ -555,48 +526,9 @@ export default function RepDetail() {
   // person. See lib/seat.ts.
   const seatLine = seatLineFor(member);
   const offices = placesLine(member.districtPlaces);
-  // Same string the share card and every other surface uses for this person.
-  const memberSubtitle = isSenator
-    ? `Sen. ${member.state}`
-    : `Rep. ${member.state}${atLarge ? ' at-large' : `-${districtStr}`}`;
 
   const cycle = donorProfile?.cycle ?? null;
-  const topOverlap = overlaps[0] ?? null;
   const topSectors = (donorProfile?.byIndustry ?? []).filter((r) => r.amount > 0).slice(0, 3);
-  const shownOverlaps = isQuick ? overlaps.slice(0, 3) : overlaps;
-  const cardContext: MemberCardContext = {
-    bioguideId: member.bioguideId,
-    memberName: member.name,
-    memberSubtitle,
-    cycle,
-    totalDisclosed: donorProfile?.totalItemized ?? null,
-  };
-  /**
-   * The band note(s) for the whole overlap list, said once instead of per row.
-   * Wording still comes from @ftm/core; `bandNoteFor` only picks which string.
-   */
-  const bandLines = distinctBands(shownOverlaps.map((o) => o.score))
-    .map((score) => bandNoteFor(score, isQuick));
-
-  /**
-   * Why some of these bills get no share image, counted and said once.
-   *
-   * `shareEligibility()` still decides per bill and still hides the button per
-   * bill — nothing about the refusal changes. What changed is that its
-   * explanation used to be printed on every refused row, and on a page where
-   * every overlap is under 10% that is the same sentence five times.
-   */
-  // Not a useMemo: this sits below the loading/error early returns, so a hook
-  // here would change the hook order between renders. It is a loop over at most
-  // a few dozen rows.
-  const shareRefusals = (() => {
-    const counts = new Map<string, number>();
-    for (const o of shownOverlaps) {
-      const e = shareEligibility(findingFor(o, o.bill, cardContext));
-      if (!e.eligible && e.reason) counts.set(e.reason, (counts.get(e.reason) ?? 0) + 1);
-    }
-    return [...counts.entries()];
-  })();
   const shownDonors = isQuick ? topDonors.slice(0, 5) : topDonors;
   /**
    * The rows that are actually somebody. The synthetic "No employer listed on the
@@ -658,7 +590,7 @@ export default function RepDetail() {
           </div>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]">
+        <div className="grid gap-4 lg:grid-cols-2">
           <div className="card-data p-4">
             <h3 className="label">Money reported to the FEC</h3>
             <div className="tnum mt-1 text-2xl font-semibold leading-tight text-ink-0">
@@ -720,26 +652,6 @@ export default function RepDetail() {
             </DataLimit>
           </div>
 
-          <div className="card-data p-4">
-            <h3 className="label mb-2">Biggest overlap with a bill</h3>
-            {topOverlap ? (
-              <>
-                <Link to={`/bills/${topOverlap.billId}`} className="tap-24 block text-sm leading-snug text-ink-1 hover:text-accent">
-                  {topOverlap.bill
-                    ? `${billLabel(topOverlap.bill.billType, topOverlap.bill.billNumber)} — ${topOverlap.bill.title}`
-                    : topOverlap.billId}
-                </Link>
-                <div className="mt-2">
-                  <OverlapScore score={topOverlap.score} size="sm" plain={isQuick} />
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-ink-2">
-                No bill this member worked on shares an industry with their reported donors in this
-                data.
-              </p>
-            )}
-          </div>
         </div>
 
         {/* The one control that lets the page say "no". Directly under the
@@ -902,9 +814,9 @@ export default function RepDetail() {
                       <tr key={`${d.name}-${d.industry}-${i}`}>
                         <td className="py-1.5 pr-3 align-top text-ink-1">{d.name}</td>
                         <td className="py-1.5 pr-3 align-top">
-                          <Link className="link" to={`/industries/${d.industry}`}>
+                          <span title={INDUSTRY_BY_ID[d.industry]?.blurb}>
                             {INDUSTRY_BY_ID[d.industry]?.label ?? d.industry}
-                          </Link>
+                          </span>
                         </td>
                         <td className="py-1.5 pr-3 align-top text-ink-2">
                           {d.kind === 'committee' ? <Term k="pac">PAC / committee</Term> : DONOR_KIND_LABEL[d.kind] ?? d.kind}
@@ -940,164 +852,6 @@ export default function RepDetail() {
             </DataLimit>
           </section>
 
-          {/* ---- overlap -------------------------------------------------- */}
-          <section>
-            <SectionTitle
-              note={
-                isQuick && overlaps.length > shownOverlaps.length
-                  ? `${shownOverlaps.length} of ${overlaps.length}`
-                  : `${overlaps.length} bill${overlaps.length === 1 ? '' : 's'}`
-              }
-            >
-              Bills they worked on, next to their donors
-            </SectionTitle>
-            {/* The one framing block on this page. It used to print the exact
-                sentence the sticky banner was already showing two inches below
-                it, which is how a reader learns to stop reading both. */}
-            <FramingNote className="mb-4" />
-
-            {/* ---------------------------------------------------------------
-                ONE band statement for the whole list, not one per row.
-
-                Every row carried its own copy of the same sentence — "Few or
-                none of this member's top disclosed donor industries have an
-                obvious stake in this bill" — printed six times, identically,
-                down one page. Testing counted it as six separate hedges, and
-                that is how it read: a reader does not experience six copies as
-                six times the care, they experience it as noise and stop reading
-                the seventh thing, which might have been the one that mattered.
-
-                Nothing is deleted. The sentence still comes from @ftm/core, it
-                is still shown, and every bar below still carries its band label
-                and the formal band in its accessible name. It is said once, for
-                the set, and the set is almost always one band. When it is not,
-                one line per band appears — still bounded by four, not by the
-                number of bills. */}
-            {shownOverlaps.length > 0 && (
-              <div className="mb-4 max-w-measure-wide space-y-1 text-sm leading-relaxed text-ink-2">
-                {bandLines.map((line) => <p key={line}>{line}</p>)}
-                {shareRefusals.map(([reason, n]) => (
-                  <p key={reason} className="text-ink-3">
-                    {n === shownOverlaps.length
-                      ? `None of these ${shownOverlaps.length} can be turned into a share image. `
-                      : `${n} of these ${shownOverlaps.length} cannot be turned into a share image. `}
-                    {reason.replace(/^No image for this one\.\s*/, '')}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {overlaps.length === 0 ? (
-              <Empty>
-                No bill this member sponsored, cosponsored or has committee responsibility for
-                shares an industry with their reported donors in this data.
-              </Empty>
-            ) : (
-              <ul className="space-y-3">
-                {shownOverlaps.map((o) => {
-                  const bill = o.bill;
-                  const label = bill ? billLabel(bill.billType, bill.billNumber) : o.billId;
-                  const top = o.matches[0] ?? null;
-                  const topLabel = top ? (INDUSTRY_BY_ID[top.industry]?.label ?? top.industry) : null;
-                  const role = roleFor(bill, member.bioguideId);
-                  return (
-                    <li key={o.billId} className="card p-4">
-                      {/* A real heading, so this list is navigable by heading
-                          and so the h4s inside <WhatThisMeans/> below sit at a
-                          legal level rather than jumping h2 → h4. */}
-                      <h3 className="flex flex-wrap items-baseline gap-x-2 font-normal">
-                        <Link to={`/bills/${o.billId}`} className="tap-24 mono shrink-0 text-xs text-ink-4 hover:text-accent">
-                          {label}
-                        </Link>
-                        <Link to={`/bills/${o.billId}`} className="tap-24 text-base leading-snug text-ink-1 hover:text-accent">
-                          {bill?.title ?? 'Title not in this data'}
-                        </Link>
-                      </h3>
-
-                      {bill && (
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
-                          <span className="chip">{role}</span>
-                          {bill.latestActionDate && <span>Last moved {shortDate(bill.latestActionDate)}</span>}
-                          {!isQuick && bill.policyArea && <span>· {bill.policyArea}</span>}
-                          {!isQuick && <MethodTag method={bill.classificationMethod} />}
-                          <SourceLink href={bill.congressDotGovUrl}>congress.gov</SourceLink>
-                        </div>
-                      )}
-
-                      <div className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
-                        <div className="min-w-0">
-                          {isQuick ? (
-                            topLabel && top ? (
-                              <p className="text-sm leading-relaxed text-ink-2">
-                                Of all the money {member.name} reported, {plainShare(o.score)} came
-                                from industries this bill would affect. The biggest is{' '}
-                                <Link className="link" to={`/industries/${top.industry}`}>{topLabel}</Link>{' '}
-                                — {plainAmount(top.donorAmount)}.
-                              </p>
-                            ) : null
-                          ) : (
-                            <>
-                              {topLabel && top && (
-                                <p className="text-sm leading-relaxed text-ink-2">
-                                  Largest shared sector:{' '}
-                                  <Link className="link" to={`/industries/${top.industry}`}>{topLabel}</Link> —{' '}
-                                  <span className="tnum">{usd(top.donorAmount, { compact: true })}</span> disclosed to
-                                  this member ({(top.donorShare * 100).toFixed(1)}% of their money), against a
-                                  classifier confidence of {Math.round(top.billConfidence * 100)}% that the bill
-                                  affects it.
-                                </p>
-                              )}
-                              <p className="mt-2 text-sm leading-relaxed text-ink-2">
-                                {describeOverlap(o, member.name, label)}
-                              </p>
-                            </>
-                          )}
-                          <WhatThisMeans
-                            overlap={o}
-                            facts={o.meaning}
-                            memberName={member.name}
-                            billLabel={label}
-                            totalDisclosed={donorProfile?.totalItemized ?? 0}
-                            hasVote={votes.length > 0}
-                            classificationMethod={bill?.classificationMethod ?? null}
-                            defaultOpen={!isQuick}
-                          />
-                          <div className="mt-3">
-                            {/* The refusal reason is stated once above this
-                                list, not on every row that gets refused. The
-                                refusal itself is unchanged. */}
-                            <ShareCardButton showReason={false} finding={findingFor(o, bill, cardContext)} />
-                          </div>
-                        </div>
-
-                        <div className="sm:w-56">
-                          {/* Band note suppressed: stated once above the
-                              list. The label and the accessible name still
-                              carry the band on every bar. */}
-                          <OverlapScore
-                            score={o.score}
-                            size="md"
-                            showExplainer={false}
-                            showBandNote={false}
-                            plain={isQuick}
-                          />
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {isQuick && overlaps.length > shownOverlaps.length && (
-              <div className="mt-4">
-                <button type="button" onClick={() => setView('full')} className="btn">
-                  Show all {overlaps.length} bills
-                </button>
-              </div>
-            )}
-          </section>
-
           {/* ---- roll-call votes ------------------------------------------ */}
           <section>
             <SectionTitle note={votes.length > 0 ? `${votes.length} recorded` : undefined}>
@@ -1112,43 +866,31 @@ export default function RepDetail() {
               </CoverageNote>
             ) : (
               <Fold open={!isQuick} title={`${votes.length} recorded vote${votes.length === 1 ? '' : 's'}`}>
+                {/* Each vote used to carry a match number beside it, with a
+                    sentence explaining that the number did not use the vote. The
+                    number is gone from the site, so the sentence it needed is
+                    gone too. What is left is the record: the question, the
+                    position, the date, and a link to the clerk's own page. */}
                 <p className="mb-2 max-w-measure-wide text-sm leading-relaxed text-ink-2">
                   A <Term k="rollCall">roll-call vote</Term> is one where each member is recorded by
-                  name. Where a vote has an overlap score beside it, that score does not use the vote
-                  and the vote is not explained by the score — said here once, rather than under
-                  every row.
+                  name. This list is the record itself. Nothing here explains why anyone voted as
+                  they did.
                 </p>
                 <ul className="divide-y divide-line">
-                  {votes.map((v) => {
-                    const o = v.billId ? overlaps.find((x) => x.billId === v.billId) : undefined;
-                    const top = o?.matches[0];
-                    return (
-                      <li key={v.id} className="py-3">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="text-sm text-ink-1">{v.question}</span>
-                          <span className="chip">{v.position}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
-                          <span>{shortDate(v.date)}</span>
-                          <span>· {v.result}</span>
-                          {v.billId && <Link className="link" to={`/bills/${v.billId}`}>Bill</Link>}
-                          <SourceLink href={v.sourceUrl}>Roll-call record</SourceLink>
-                        </div>
-                        {o && top && (
-                          <div className="mt-2 sm:max-w-sm">
-                            {/* Band note and the "the number does not use the
-                                vote" sentence are both stated once above this
-                                list rather than on every vote. */}
-                            <OverlapScore score={o.score} size="sm" showExplainer={false} showBandNote={false} plain={isQuick} />
-                            <p className="mt-1 text-xs text-ink-3">
-                              Biggest shared industry on this bill:{' '}
-                              {INDUSTRY_BY_ID[top.industry]?.label ?? top.industry}.
-                            </p>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
+                  {votes.map((v) => (
+                    <li key={v.id} className="py-3">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-sm text-ink-1">{v.question}</span>
+                        <span className="chip">{v.position}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
+                        <span>{shortDate(v.date)}</span>
+                        <span>· {v.result}</span>
+                        {v.billId && <Link className="link" to={`/bills/${v.billId}`}>Bill</Link>}
+                        <SourceLink href={v.sourceUrl}>Roll-call record</SourceLink>
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               </Fold>
             )}
@@ -1193,9 +935,9 @@ export default function RepDetail() {
                         <span>{a.awardType}</span>
                         {a.awardingAgency && <span>· {a.awardingAgency}</span>}
                         <span>· {shortDate(a.actionDate)}</span>
-                        <Link className="link" to={`/industries/${a.industry}`}>
+                        <span title={INDUSTRY_BY_ID[a.industry]?.blurb}>
                           {INDUSTRY_BY_ID[a.industry]?.label ?? a.industry}
-                        </Link>
+                        </span>
                         <SourceLink href={a.sourceUrl}>USASpending</SourceLink>
                       </div>
                     </li>
@@ -1237,10 +979,6 @@ export default function RepDetail() {
               <div className="flex justify-between gap-3">
                 <dt className="text-ink-3">Committees</dt>
                 <dd className="tnum text-ink-1">{committees.length}</dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-ink-3">Bills with an overlap</dt>
-                <dd className="tnum text-ink-1">{overlaps.length}</dd>
               </div>
             </dl>
           </div>

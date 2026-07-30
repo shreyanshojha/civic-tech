@@ -1,3 +1,15 @@
+/**
+ * The bill list.
+ *
+ * Two things were cut here with the overlap score: the "Largest overlap" sort
+ * option, and the "N members whose donors are in these industries" line on each
+ * row. Both were counts of a number no page shows any more. `bills.json` still
+ * carries `topOverlap` and `overlapCount`; nothing reads them.
+ *
+ * The percentage still on a row is the classifier's confidence in a tag. It is
+ * about the bill, never about a member, and it says so in words on the chip.
+ */
+
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { INDUSTRY_BY_ID, shortDate } from '@ftm/core';
@@ -10,7 +22,7 @@ import { ViewToggle } from '../components/ViewToggle';
 import { Term } from '../components/Glossary';
 import { parseView, useViewMode } from '../lib/view';
 
-type SortKey = 'recent' | 'overlap' | 'cosponsors' | 'title';
+type SortKey = 'recent' | 'cosponsors' | 'title';
 
 export default function Bills() {
   const { data: bills, error, loading } = useAsync(getBills, []);
@@ -58,7 +70,6 @@ export default function Bills() {
 
     out = out.slice().sort((a, b) => {
       switch (sort) {
-        case 'overlap': return (b.topOverlap?.score ?? -1) - (a.topOverlap?.score ?? -1);
         case 'cosponsors': return b.cosponsorCount - a.cosponsorCount;
         case 'title': return a.title.localeCompare(b.title);
         default: return String(b.latestActionDate ?? '').localeCompare(String(a.latestActionDate ?? ''));
@@ -117,7 +128,6 @@ export default function Bills() {
             className="control h-9 px-2 text-sm"
           >
             <option value="recent">Most recent action</option>
-            <option value="overlap">Largest overlap</option>
             <option value="cosponsors">Most cosponsors</option>
             <option value="title">Title A–Z</option>
           </select>
@@ -156,7 +166,8 @@ export default function Bills() {
         <p className="mb-3 max-w-measure-wide text-sm leading-relaxed text-ink-2">
           The percentage on an industry tag is{' '}
           <Term k="confidence">how sure this tool is</Term> that the bill touches that industry. It
-          is not an overlap number, and it says nothing about any member.
+          says nothing about any member and nothing about money. Tap a tag to see the other bills
+          with it.
         </p>
 
         {loading ? (
@@ -210,11 +221,6 @@ export default function Bills() {
                       <span>{b.cosponsorCount} <Term k="cosponsor">cosponsors</Term></span>
                       {b.latestActionDate && <span>Last action {shortDate(b.latestActionDate)}</span>}
                       {b.policyArea && <span>· {b.policyArea}</span>}
-                      {b.overlapCount > 0 && (
-                        <span className="text-ink-3">
-                          {b.overlapCount} member{b.overlapCount === 1 ? '' : 's'} whose donors are in these industries
-                        </span>
-                      )}
                     </div>
 
                     {b.industries.length > 0 && (
@@ -225,7 +231,7 @@ export default function Bills() {
                             type="button"
                             onClick={() => setIndustryFilter(i.industry)}
                             className="chip"
-                            title={`${INDUSTRY_BY_ID[i.industry]?.blurb ?? ''} — this tool is ${Math.round(i.confidence * 100)}% sure of the tag. That is not an overlap number.`}
+                            title={`${INDUSTRY_BY_ID[i.industry]?.blurb ?? ''} — this tool is ${Math.round(i.confidence * 100)}% sure of the tag. Tap to filter this list by it.`}
                           >
                             <span>
                               tagged {INDUSTRY_BY_ID[i.industry]?.label ?? i.industry}{' '}

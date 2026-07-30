@@ -236,9 +236,11 @@ export default function About() {
             reader should not be able to tell “which side” a page is about at a glance.
           </li>
           <li>
-            · <strong className="font-semibold">A score is never an alarm.</strong> Overlap magnitudes
-            use one neutral ink ramp, so the eye reads “more or less”, never “good or bad”. A high
-            overlap is common and frequently has an entirely ordinary explanation.
+            · <strong className="font-semibold">A number is never an alarm.</strong> Every bar on this
+            site uses one neutral ink ramp, so the eye reads “more or less”, never “good or bad”. This
+            is also why the site no longer prints a match number between one member and one bill: it
+            was read as a verdict, and money lining up with a member's own subject area is common and
+            usually has an entirely ordinary explanation.
           </li>
           <li>
             · <strong className="font-semibold">Framing travels with the data.</strong> Every

@@ -1,13 +1,28 @@
 /**
  * One search box for the whole application.
  *
- * It searches members, bills, sectors and federal award recipients from a single
- * prebuilt index file, entirely in the browser. No query ever leaves the device.
+ * It searches members, bills and sectors from a single prebuilt index file,
+ * entirely in the browser. No query ever leaves the device.
  *
  * Ranking is deliberately simple and explainable: exact label match, then label
  * prefix, then label substring, then a match anywhere in the entity's indexed
  * terms. Ties break toward members and bills, which is what people are usually
  * looking for.
+ *
+ * ---------------------------------------------------------------------------
+ * ONE RESULT KIND IS DROPPED HERE, NOT IN THE DATA.
+ *
+ * `search.json` still carries federal award recipients, because the export step
+ * is unchanged. Their only destination was the federal-spending page, and that
+ * page is gone — so a recipient result would open nothing. A result that leads
+ * nowhere is worse than no result: it teaches a reader the search is broken.
+ * They are filtered out of the ranking rather than out of the file.
+ *
+ * Sector results survive, and they now open the bills tagged to that sector,
+ * which is a real list from a complete file. They used to open a per-sector page
+ * whose member ranking was built on each member's top three donor sectors only,
+ * which is why that page is gone.
+ * ---------------------------------------------------------------------------
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -15,21 +30,41 @@ import { useNavigate } from 'react-router-dom';
 import { getSearchIndex, type SearchEntry } from '../lib/data';
 import { useAsync, useDebounced } from '../lib/hooks';
 
-const TYPE_LABEL: Record<SearchEntry['t'], string> = {
+/** The result kinds that still have somewhere to go. */
+export type LinkedType = 'member' | 'bill' | 'industry';
+export type LinkedEntry = SearchEntry & { t: LinkedType };
+
+const TYPE_LABEL: Record<LinkedType, string> = {
   member: 'Member of Congress',
   bill: 'Bill',
   industry: 'Sector',
-  recipient: 'Federal award recipient',
 };
 
-const TYPE_ORDER: Record<SearchEntry['t'], number> = { member: 0, bill: 1, industry: 2, recipient: 3 };
+/**
+ * The second line of a result row.
+ *
+ * For a sector it states the destination rather than repeating the sector's
+ * definition, because the destination changed: picking a sector opens the bills
+ * tagged to it, not a page about the sector. A row that does not say where it
+ * goes is a row a reader has to click to find out.
+ */
+function subLineFor(e: LinkedEntry): string {
+  return e.t === 'industry' ? 'Opens the bills tagged with this sector' : e.sub;
+}
 
-export function rankResults(index: SearchEntry[], raw: string, limit = 24): SearchEntry[] {
+const TYPE_ORDER: Record<LinkedType, number> = { member: 0, bill: 1, industry: 2 };
+
+function isLinked(e: SearchEntry): e is LinkedEntry {
+  return e.t === 'member' || e.t === 'bill' || e.t === 'industry';
+}
+
+export function rankResults(index: SearchEntry[], raw: string, limit = 24): LinkedEntry[] {
   const q = raw.trim().toLowerCase();
   if (q.length < 2) return [];
-  const scored: { e: SearchEntry; score: number }[] = [];
+  const scored: { e: LinkedEntry; score: number }[] = [];
 
   for (const e of index) {
+    if (!isLinked(e)) continue;
     const label = e.label.toLowerCase();
     let score = -1;
     if (label === q) score = 0;
@@ -45,12 +80,11 @@ export function rankResults(index: SearchEntry[], raw: string, limit = 24): Sear
   return scored.slice(0, limit).map((s) => s.e);
 }
 
-function hrefFor(e: SearchEntry): string {
+export function hrefFor(e: LinkedEntry): string {
   switch (e.t) {
     case 'member': return `/reps/${e.id}`;
     case 'bill': return `/bills/${e.id}`;
-    case 'industry': return `/industries/${e.id}`;
-    case 'recipient': return `/spending?q=${encodeURIComponent(e.label)}`;
+    case 'industry': return `/bills?industry=${encodeURIComponent(e.id)}`;
   }
 }
 
@@ -107,7 +141,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
     };
   }, []);
 
-  const go = useCallback((e: SearchEntry) => {
+  const go = useCallback((e: LinkedEntry) => {
     setOpen(false);
     setQ('');
     navigate(hrefFor(e));
@@ -150,7 +184,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder={compact ? 'Search…' : 'Search members, bills, sectors, contractors…'}
+          placeholder={compact ? 'Search…' : 'Search members, bills and sectors…'}
           aria-label={compact ? 'Search everything (site header)' : 'Search everything'}
           aria-expanded={listOpen}
           role="combobox"
@@ -192,8 +226,8 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                 Nothing matches “{debounced}”. Try a surname, a bill number like “hr 1234”, or a
                 sector.
               </p>
-              {/* This box searches an index of members, bills, sectors and award
-                  recipients. It does not and cannot resolve an address — and a
+              {/* This box searches an index of members, bills and sectors. It
+                  does not and cannot resolve an address — and a
                   reader who types one and is told only "nothing matches"
                   reasonably concludes the site has nothing for them, when in
                   fact the tool that answers their question is one page away.
@@ -231,7 +265,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean }) {
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm text-ink-1">{r.label}</span>
-                      <span className="block truncate text-xs text-ink-3">{r.sub}</span>
+                      <span className="block truncate text-xs text-ink-3">{subLineFor(r)}</span>
                     </span>
                   </button>
                 </li>
