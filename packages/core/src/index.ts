@@ -7,4 +7,5 @@ export * from './meaning.js';
 export * from './plain-bill.js';
 export * from './overlap.js';
 export * from './patterns.js';
+export * from './donor-name.js';
 export * from './format.js';

@@ -18,6 +18,17 @@
  * the three biggest sectors as bars, the single biggest overlap — and the rest
  * of the page folds underneath it.
  *
+ * The names now come BEFORE the sector labels. A first-time reader was given her
+ * own congressman's page and the only thing on it that meant anything to her was
+ * the list of who gave — Regions Financial, Drummond, Alabama Power. That list
+ * sat four expanders deep behind "Show all 41 rows", under three abstract sector
+ * labels covering about 15% of the money. Her verdict: the site led with the
+ * abstraction and hid the concrete thing it already knew. So the seven biggest
+ * named rows are the first block under the header, open, no tapping — see
+ * `<NamedDonors/>` below. Nothing was deleted to make room: the sector cards, the
+ * full "By industry" bars and the whole donor table are all still on the page,
+ * further down.
+ *
  * The coverage gaps (money with no employer on file, money with an employer we
  * could not place, absent roll-call votes) are NOT folded away. A short plain
  * version of the most important one sits inside the at-a-glance block, next to
@@ -30,7 +41,8 @@
 import { useId, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  INDUSTRIES, INDUSTRY_BY_ID, billLabel, describeOverlap, plainAmount, plainShare, shortDate, usd,
+  INDUSTRIES, INDUSTRY_BY_ID, billLabel, describeOverlap, donorDisplayName, isNoEmployerAggregate,
+  plainAmount, plainShare, shortDate, usd,
 } from '@ftm/core';
 import type { IndustryId } from '@ftm/core';
 import { getIndex, getMemberDetail } from '../lib/data';
@@ -102,6 +114,157 @@ const DONOR_KIND_LABEL: Record<string, string> = {
   committee: 'PAC / committee',
   individual: 'Individual',
 };
+
+/**
+ * One row of the member bundle's donor list. Structural, so this file does not
+ * have to import the whole MemberDetail shape to describe seven rows.
+ */
+interface DonorRow {
+  name: string;
+  industry: IndustryId;
+  amount: number;
+  kind: string;
+  sourceUrl: string;
+}
+
+/** Seven. Enough to recognise a name, few enough to read without scrolling. */
+const NAMED_DONORS_LEAD = 7;
+
+/**
+ * Two words per row saying which of the two very different things this is.
+ *
+ * A committee row IS a donor: a PAC that made a contribution under its own name.
+ * An individual row is not one donor at all — it is the employer name that
+ * people typed on their own filings, added together. Companies cannot give to
+ * federal candidates. The donor table further down the page spells both out in
+ * full; this is the short marker so the promoted list cannot silently conflate
+ * them.
+ */
+const DONOR_KIND_TAG: Record<string, string> = {
+  committee: 'PAC',
+  individual: 'Its employees',
+};
+
+/**
+ * The rows themselves. Name, amount, sector — nothing else, because the point of
+ * this block is that seven names are readable in about four seconds.
+ */
+function NamedDonorRows({ rows }: { rows: DonorRow[] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {rows.map((d, i) => {
+        const n = donorDisplayName(d.name);
+        // 'other' is not a sector, it is the absence of one. Saying "Not placed"
+        // is the same claim the rest of the page makes about this money, in two
+        // words, and it does not dress a gap up as a finding.
+        const placed = d.industry !== 'other';
+        const label = INDUSTRY_BY_ID[d.industry]?.label ?? d.industry;
+        return (
+          <li key={`${d.name}-${i}`} className="py-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+              {/*
+                The filed name travels with the shortened one, on `title` and in
+                the accessible name. Shortening is the easiest way for this site
+                to misattribute money to the wrong entity, so a reader must
+                always be able to see what the filing actually said without
+                trusting the shortener — see packages/core/src/donor-name.ts.
+              */}
+              <span
+                className="min-w-0 text-base font-medium text-ink-1"
+                title={n.shortened ? n.filed : undefined}
+              >
+                {n.display}
+                {n.shortened && <span className="sr-only"> — filed as {n.filed}</span>}
+              </span>
+              <span className="tnum shrink-0 font-medium text-ink-0">{usd(d.amount)}</span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              {placed ? (
+                <Link className="chip hover:text-accent" to={`/industries/${d.industry}`}>{label}</Link>
+              ) : (
+                <span className="chip">Not placed</span>
+              )}
+              <span className="text-xs text-ink-4">{DONOR_KIND_TAG[d.kind] ?? d.kind}</span>
+              {d.sourceUrl && <SourceLink href={d.sourceUrl}>The filing</SourceLink>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * WHO GAVE, BY NAME — and why it is the first block on the page.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS HIGH ON THE PAGE
+ *
+ * A dental hygienist in Cullman, Alabama read her own congressman's page. One
+ * thing on it landed: REGIONS FINANCIAL, DRUMMOND COMPANY, ALABAMA POWER,
+ * BOEING — companies she knew from her own state. "That's the only moment on
+ * the whole site where something clicked."
+ *
+ * That list was four expanders deep, behind "Show all 41 rows". What led instead
+ * was a total, a caveat about the total, and three abstract sector labels
+ * covering about 15% of the money. Her words: the site "leads with the
+ * abstraction and hides the concrete thing it actually knows". Asked what it all
+ * meant, she got four bullets of things to go and verify: "I asked a question
+ * and got assigned homework."
+ *
+ * The one change she said would make it worth her time was "lead with the names,
+ * not the categories". So seven names lead, expanded, no tapping, above the
+ * sector cards — which are still there, one screen down, along with every row of
+ * the full donor table.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT THIS BLOCK MUST NOT CLAIM
+ *
+ * It is not a ranking of all the money. Most disclosed money on a typical member
+ * page has no employer written on the filing at all, and the export puts that in
+ * one synthetic row which is NOT a donor — `isNoEmployerAggregate()` finds it and
+ * it is excluded here by construction. On some members it is the largest row in
+ * the file by far, so putting it in a list of names would be both wrong and the
+ * loudest thing on the page. It keeps its own explanation, further down, next to
+ * the figures it qualifies.
+ *
+ * The heading therefore says "by name" rather than "the most" or "the top", and
+ * the one-line description says what the rows are. No amber here: amber means
+ * "the data has a gap" (styles.css §1, DESIGN.md), and a list of donors is not a
+ * gap.
+ * ---------------------------------------------------------------------------
+ */
+function NamedDonors({ rows, isQuick }: { rows: DonorRow[]; isQuick: boolean }) {
+  const lead = rows.slice(0, NAMED_DONORS_LEAD);
+  const rest = rows.slice(NAMED_DONORS_LEAD);
+  return (
+    <div className="card-data p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-md font-semibold leading-snug text-ink-0">Who gave, by name</h3>
+        <span className="tnum text-xs text-ink-3">
+          {lead.length} of {rows.length} named rows
+        </span>
+      </div>
+      <p className="mb-2 mt-1 max-w-measure-wide text-sm leading-snug text-ink-2">
+        These are the largest reported amounts that carry a name — a PAC that gave under its own
+        name, or an employer that donors wrote on their own filings.
+      </p>
+      <NamedDonorRows rows={lead} />
+      {/* The "show all" disclosure is kept, but it is no longer the only way to
+          see any names: it now opens the rest of a list that is already useful. */}
+      {rest.length > 0 && (
+        <Fold
+          className="mt-2"
+          open={!isQuick}
+          title={`The other ${rest.length} names`}
+          note={`down to ${usd(rest[rest.length - 1]?.amount ?? 0)}`}
+        >
+          <NamedDonorRows rows={rest} />
+        </Fold>
+      )}
+    </div>
+  );
+}
 
 /**
  * The three biggest sectors, as bars, with the share said in words.
@@ -435,6 +598,13 @@ export default function RepDetail() {
     return [...counts.entries()];
   })();
   const shownDonors = isQuick ? topDonors.slice(0, 5) : topDonors;
+  /**
+   * The rows that are actually somebody. The synthetic "No employer listed on the
+   * filing" row is a statement about missing data, not a donor, and on some
+   * members it is over 90% of the file — it stays out of a list of names and
+   * keeps its own explanation in the section below. Already sorted by amount.
+   */
+  const namedDonors = topDonors.filter((d) => !isNoEmployerAggregate(d.name));
   const shownAwards = isQuick ? districtAwards.slice(0, 5) : districtAwards;
 
   const awardTotal = districtAwards.reduce((s, a) => s + a.amount, 0);
@@ -479,6 +649,15 @@ export default function RepDetail() {
           where those two lists overlap most. Everything under it is detail. */}
       <section className="mt-6">
         <h2 className="sr-only">At a glance</h2>
+
+        {/* The names first. See the <NamedDonors/> comment: the abstraction was
+            leading and the recognisable names were behind a disclosure. */}
+        {namedDonors.length > 0 && (
+          <div className="mb-4">
+            <NamedDonors rows={namedDonors} isQuick={isQuick} />
+          </div>
+        )}
+
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]">
           <div className="card-data p-4">
             <h3 className="label">Money reported to the FEC</h3>
@@ -683,7 +862,11 @@ export default function RepDetail() {
             )}
           </section>
 
-          {/* ---- top donors ----------------------------------------------- */}
+          {/* ---- top donors -----------------------------------------------
+              Still here, unchanged, with every row, the Kind column and the
+              per-row source. It is no longer the ONLY place a name appears —
+              the seven biggest named rows are at the top of the page now — so
+              this table is the full reference rather than the first sighting. */}
           <section>
             {/* ---------------------------------------------------------------
                 "Biggest donors" over a column headed DONOR was wrong for most

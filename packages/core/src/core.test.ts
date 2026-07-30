@@ -31,6 +31,7 @@ import {
   seededRandom,
   type MemberObservation,
 } from './patterns.js';
+import { donorDisplayName, isNoEmployerAggregate } from './donor-name.js';
 import type { BillClassification, DonorProfile } from './types.js';
 
 describe('keyword industry classifier', () => {
@@ -913,5 +914,101 @@ describe('cohort pattern statistics', () => {
     // not, and must not be the headline sentence.
     const p = adjustPatterns([computePattern(buildInput(Array(20).fill(0.3), Array(60).fill(0.05)))!])[0]!;
     expect(describeCohortSpread(p)).toMatch(/\d+ of the committee's \d+ members/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DONOR DISPLAY NAMES
+//
+// Shortening a donor's filed name is the easiest way for this project to
+// misattribute money to the wrong entity, silently and at scale. So the tests
+// here are mostly about what must NOT happen.
+// ---------------------------------------------------------------------------
+describe('donor display names', () => {
+  const d = (s: string) => donorDisplayName(s).display;
+
+  it('strips the fundraising vehicle and leaves the entity', () => {
+    expect(d('REGIONS FINANCIAL CORPORATION POLITICAL ACTION COMMITTEE')).toBe('Regions Financial');
+    expect(d('DELOITTE POLITICAL ACTION COMMITTEE')).toBe('Deloitte');
+    expect(d('MAYNARD NEXSEN PAC')).toBe('Maynard Nexsen');
+    expect(d('LOCKHEED MARTIN CORPORATION EMPLOYEES POLITICAL ACTION COMMITTEE')).toBe('Lockheed Martin');
+    expect(d('ALABAMA POWER CO EMPLOYEES FEDERAL POLITICAL ACTION CMTE')).toBe('Alabama Power');
+    expect(d('CSX CORPORATION GOOD GOVERNMENT FUND')).toBe('CSX');
+    expect(d('NRA POLITICAL VICTORY FUND')).toBe('NRA');
+  });
+
+  it('drops a leading "The" only once the corporate form is gone', () => {
+    // The first implementation produced "The Boeing" — it ate COMPANY and left
+    // the article stranded.
+    expect(d('THE BOEING COMPANY PAC')).toBe('Boeing');
+    expect(d('THE FARM CREDIT COUNCIL POLITICAL ACTION COMMITTEE')).toBe('Farm Credit Council');
+  });
+
+  it('handles vehicle words in any order', () => {
+    // "AT&T INC. FEDERAL POLITICAL ACTION COMMITTEE" produced "AT&T Inc. Federal"
+    // under phrase matching: the committee words went, the qualifier stayed.
+    expect(d('AT&T INC. FEDERAL POLITICAL ACTION COMMITTEE')).toBe('AT&T');
+    expect(d('GENERAL ATOMICS FEDERAL PAC')).toBe('General Atomics');
+    expect(d('BLUE ORIGIN, LLC PAC')).toBe('Blue Origin');
+  });
+
+  it('removes a committee short-name prefix but keeps the organisation', () => {
+    expect(d('WATERPAC - NATIONAL RURAL WATER ASSOCIATION POLITICAL COMMITTEE'))
+      .toBe('National Rural Water Association');
+  });
+
+  it('never title-cases an acronym into nonsense', () => {
+    expect(d('NRA POLITICAL VICTORY FUND')).toBe('NRA');
+    expect(d('AT&T INC. FEDERAL POLITICAL ACTION COMMITTEE')).toBe('AT&T');
+    // UAW-V-CAP became "Uaw-V-Cap" before hyphenated all-caps were detected.
+    expect(d('UAW-V-CAP (UAW VOLUNTARY COMMUNITY ACTION PROGRAM)')).toMatch(/^UAW-V-CAP/);
+  });
+
+  it('never reduces a name to an unidentifiable stub', () => {
+    // Every token is noise. The filed name is then the only honest answer.
+    expect(d('PAC')).toBe('PAC');
+    expect(d('POLITICAL ACTION COMMITTEE')).toBe('POLITICAL ACTION COMMITTEE');
+    expect(d('FUND')).toBe('FUND');
+    for (const s of ['PAC', 'FUND', 'COMMITTEE', 'INC', 'THE COMPANY']) {
+      expect(donorDisplayName(s).display.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('always carries the filed name so a reader can check the filing', () => {
+    const r = donorDisplayName('REGIONS FINANCIAL CORPORATION POLITICAL ACTION COMMITTEE');
+    expect(r.filed).toBe('REGIONS FINANCIAL CORPORATION POLITICAL ACTION COMMITTEE');
+    expect(r.shortened).toBe(true);
+    const unchanged = donorDisplayName('Pilot Catastrophe');
+    expect(unchanged.shortened).toBe(false);
+  });
+
+  it('leaves a name alone when the filer already chose its casing', () => {
+    // Not all-caps means somebody made a decision we have no grounds to override.
+    expect(d('iHeartMedia')).toBe('iHeartMedia');
+    expect(d('eBay')).toBe('eBay');
+  });
+
+  it('never invents, expands or substitutes a word', () => {
+    // Whatever comes out must be a subsequence of the words that went in — the
+    // guarantee that stops this function renaming an entity.
+    const samples = [
+      'REGIONS FINANCIAL CORPORATION POLITICAL ACTION COMMITTEE',
+      'ASSOCIATED BUILDERS AND CONTRACTORS, INC. POLITICAL ACTION COMMITTEE (ABC PAC)',
+      'MOTOROLA SOLUTIONS INC. PAC',
+      'THE BOEING COMPANY PAC',
+    ];
+    for (const s of samples) {
+      const inWords = s.toLowerCase().replace(/[^a-z0-9&\s-]/g, ' ').split(/\s+/).filter(Boolean);
+      const outWords = d(s).toLowerCase().replace(/[^a-z0-9&\s-]/g, ' ').split(/\s+/).filter(Boolean);
+      for (const w of outWords) expect(inWords).toContain(w);
+    }
+  });
+
+  it('recognises the no-employer aggregate, which is not a donor', () => {
+    expect(isNoEmployerAggregate('No employer listed on the filing (5 filing categories combined)')).toBe(true);
+    expect(isNoEmployerAggregate('REGIONS FINANCIAL CORPORATION')).toBe(false);
+    // …and never dresses it up as one.
+    const r = donorDisplayName('No employer listed on the filing (5 filing categories combined)');
+    expect(r.shortened).toBe(false);
   });
 });

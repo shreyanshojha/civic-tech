@@ -42,6 +42,24 @@ export const ORG_KNOWLEDGE: OrgKnowledgeEntry[] = [
   { match: 'DIGITAL FREEDOM FUND', kind: 'contains', industry: 'crypto', confidence: 0.7, note: 'Digital-asset advocacy committee.' },
   { match: 'BLOCKCHAIN ASSOCIATION', kind: 'contains', industry: 'crypto', confidence: 0.95, note: 'Digital-asset trade association.' },
 
+  // --- Named employers a first-time reader recognised and the site did not ---
+  // A reader in Alabama opened her own congressman's donor list and saw
+  // DRUMMOND COMPANY, MOTOROLA SOLUTIONS, GENERAL ATOMICS and BLUE ORIGIN all
+  // filed under "Other / Unclassified". Her point stands on its own: a reader who
+  // recognises a name the tool does not stops trusting the tool, on exactly the
+  // page where it is asking to be trusted. These are large, unambiguous
+  // employers whose sector is a matter of public record, and the keyword
+  // classifier misses them because nothing in the name states the industry.
+  { match: 'DRUMMOND COMPANY', kind: 'contains', industry: 'mining', confidence: 0.95, note: 'Alabama-based coal mining company; see its own corporate description of coal operations.' },
+  { match: 'MOTOROLA SOLUTIONS', kind: 'contains', industry: 'telecom', confidence: 0.9, note: 'Land-mobile radio and public-safety communications equipment maker.' },
+  { match: 'GENERAL ATOMICS', kind: 'contains', industry: 'defense', confidence: 0.95, note: 'Defence contractor; maker of the MQ-9 Reaper and nuclear technologies.' },
+  { match: 'BLUE ORIGIN', kind: 'contains', industry: 'defense', confidence: 0.85, note: 'Launch and space systems company holding NASA and Space Force contracts. Classified aerospace/defence, which is the sector its federal revenue sits in.' },
+  { match: 'MAYNARD NEXSEN', kind: 'contains', industry: 'legal', confidence: 0.95, note: 'Law firm (Birmingham, Alabama).' },
+  { match: 'PILOT CATASTROPHE', kind: 'contains', industry: 'insurance', confidence: 0.9, note: 'Insurance catastrophe claims adjusting firm (Mobile, Alabama).' },
+  { match: 'NATIONAL RURAL WATER ASSOCIATION', kind: 'contains', industry: 'waste-water', confidence: 0.95, note: 'Trade association of rural water and wastewater utilities.' },
+  { match: 'FARM CREDIT COUNCIL', kind: 'contains', industry: 'agriculture', confidence: 0.9, note: 'Trade association of the Farm Credit System agricultural lenders.' },
+  { match: 'ASSOCIATED BUILDERS AND CONTRACTORS', kind: 'contains', industry: 'construction', confidence: 0.95, note: 'Construction industry trade association.' },
+
   // --- Trade associations, by sector ---------------------------------------
   { match: 'AMERICAN BANKERS ASSOCIATION', kind: 'contains', industry: 'finance-banking', confidence: 0.95, note: 'Banking trade association.' },
   { match: 'INDEPENDENT COMMUNITY BANKERS', kind: 'contains', industry: 'finance-banking', confidence: 0.95, note: 'Community banking trade association.' },

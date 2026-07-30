@@ -421,9 +421,31 @@ function applyKeywordBackfill(): number {
     WHERE industry = 'other' AND industry_method IN ('unassigned', 'placeholder')
   `).all() as { contributor_name: string }[];
 
+  /**
+   * `DO NOTHING` was wrong, and wrong in a way nothing surfaced.
+   *
+   * A name that has once failed to resolve gets a cache row saying so —
+   * `industry='other', method='unassigned'`. With `DO NOTHING`, that negative
+   * row permanently shadowed every later attempt, so adding an entry to
+   * ORG_KNOWLEDGE had no effect on any name that had already been tried. Four
+   * curated entries were added and verified against `lookupOrg` directly, then
+   * appeared on the page as "Not placed" anyway.
+   *
+   * So a negative row is now upgradeable. The `WHERE` clause is the important
+   * half: only a row that currently admits it knows nothing may be overwritten.
+   * A resolved answer — especially one from an LLM run somebody paid for — must
+   * never be clobbered by a later keyword guess.
+   */
   const write = db().prepare(`
     INSERT INTO employer_industry_cache (normalized_employer, industry, confidence, method, model, resolved_at)
-    VALUES (?, ?, ?, ?, NULL, ?) ON CONFLICT(normalized_employer) DO NOTHING
+    VALUES (?, ?, ?, ?, NULL, ?)
+    ON CONFLICT(normalized_employer) DO UPDATE SET
+      industry = excluded.industry,
+      confidence = excluded.confidence,
+      method = excluded.method,
+      resolved_at = excluded.resolved_at
+    WHERE employer_industry_cache.method IN ('unassigned', 'placeholder')
+       OR employer_industry_cache.industry = 'other'
   `);
   let n = 0;
   db().transaction(() => {
