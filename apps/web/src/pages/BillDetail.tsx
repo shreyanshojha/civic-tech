@@ -285,9 +285,8 @@ export default function BillDetail() {
               <CoverageNote>
                 <strong className="font-semibold">These tags were matched by keyword.</strong> They
                 come from Library of Congress labels and word matching — no language model read this
-                bill — so they are rougher than they look. Set{' '}
-                <code className="mono">LLM_PROVIDER</code> in your <code className="mono">.env</code>{' '}
-                and re-run <code className="mono">npm run classify</code> to improve them.
+                bill — so they are rougher than they look. Treat a tag here as a hint about what the
+                bill touches, not as a fact about it.
               </CoverageNote>
             )}
           </section>

@@ -923,11 +923,9 @@ export default function RepDetail() {
             {votes.length === 0 ? (
               <CoverageNote>
                 <strong className="font-semibold">This page cannot show any votes.</strong> Vote
-                records come from Congress.gov and need a free API key, which was not set when this
-                data was built. So nothing above should be read as a claim about how {member.name}{' '}
-                voted on anything. Set <code className="mono">CONGRESS_API_KEY</code> in{' '}
-                <code className="mono">.env</code> and re-run <code className="mono">npm run pipeline</code>{' '}
-                to fill this in.
+                records were not collected when this copy of the data was built. So nothing above
+                should be read as a claim about how {member.name} voted on anything. Their votes are
+                on Congress.gov, linked from their name at the top of this page.
               </CoverageNote>
             ) : (
               <Fold open={!isQuick} title={`${votes.length} recorded vote${votes.length === 1 ? '' : 's'}`}>
