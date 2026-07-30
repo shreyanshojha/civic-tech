@@ -182,6 +182,24 @@ export default function Bills() {
                       </Link>
                     </div>
 
+                    {/* Who the bill reaches, under the title.
+                        This is the first thing under a row now, ahead of the CRS
+                        policy area, because "Health" is a filing category and
+                        "Anyone who fills a prescription" is the reason a reader
+                        would open the row at all. The policy area is still on the
+                        line below.
+
+                        Deliberately NOT marked amber when the bill is
+                        title-only. This sentence comes from the subject labels
+                        either way, so its quality does not depend on whether a
+                        CRS summary exists — flagging the row would point the
+                        data-gap colour at the one sentence that has no gap. The
+                        gap is stated on the bill's own page, where the sentence
+                        it applies to is. */}
+                    {b.plain?.whoItTouches && (
+                      <p className="mt-1 max-w-measure text-sm leading-snug text-ink-2">{b.plain.whoItTouches}</p>
+                    )}
+
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
                       {sponsor && (
                         <span>

@@ -12,7 +12,8 @@
  */
 
 import type {
-  Award, BillClassification, DonorProfile, Industry, IndustryId, OverlapResult, VoteRecord,
+  Award, BillClassification, DonorProfile, Industry, IndustryId, OverlapResult, Pattern,
+  PatternVerdict, PlainBill, PlainConfidence, VoteRecord,
 } from '@ftm/core';
 
 export interface BundleIndex {
@@ -83,6 +84,11 @@ export interface BillSummary {
   classificationMethod: 'llm' | 'keyword-fallback' | null;
   topOverlap: { bioguideId: string; score: number } | null;
   overlapCount: number;
+  /**
+   * The one sentence from the plain-language layer a list row can use: who this
+   * bill reaches. Optional because an older bundle will not have it.
+   */
+  plain?: { whoItTouches: string; confidence: PlainConfidence } | null;
 }
 
 export interface MeaningFacts {
@@ -102,6 +108,12 @@ export interface BillDetail {
     officialSummary?: string; congressDotGovUrl: string; sourceUrl: string; fetchedAt: string;
   };
   classification: BillClassification | null;
+  /**
+   * What this bill does, who it reaches, and what would change — computed in the
+   * export step by `explainBillPlainly` in @ftm/core, never in the browser.
+   * Optional because an older bundle will not have it.
+   */
+  plain?: PlainBill | null;
   overlaps: (OverlapResult & {
     member: { name: string; chamber: string; state: string; district?: string; imageUrl?: string; role: string } | null;
     donorProfile: DonorProfile | null;
@@ -135,6 +147,52 @@ export interface MemberDetail {
  */
 export interface FeaturedOverlap extends OverlapResult {
   featureNote?: string;
+}
+
+/**
+ * One committee-versus-everyone-else comparison, as the ingest step wrote it.
+ *
+ * `cohortShares` and `baselineShares` are the per-member shares the distribution
+ * plot draws — one number per member, rounded, with no names attached. They are
+ * empty on a pattern whose rows were slimmed to keep the file shippable (see
+ * `PatternsFile.meta.dropped`), so the plot must handle an empty array rather
+ * than assume it is there.
+ */
+export interface PatternRow extends Pattern {
+  cohortShares: number[];
+  baselineShares: number[];
+}
+
+/**
+ * The whole pattern file, meta first.
+ *
+ * `meta.pairsTested` is the denominator of the search and the reason the list
+ * page can be read at all: without it a shortlist of eighteen looks like
+ * eighteen discoveries instead of the tail of over a thousand comparisons.
+ */
+export interface PatternsFile {
+  generatedAt: string;
+  meta: {
+    cycle: number;
+    committeesTested: number;
+    committeeChamberGroupsTested: number;
+    sectorsTested: number;
+    pairsTested: number;
+    pairsSkippedTooSmall: number;
+    verdictCounts: Record<PatternVerdict, number>;
+    patternsListed: number;
+    fdrThreshold: number;
+    permutationIterations: number;
+    smallestPossiblePValue: number;
+    minMemberTotal: number;
+    minCohortSize: number;
+    membersTested: number;
+    membersWithMoney: number;
+    membersTotal: number;
+    dropped: string[];
+    elapsedMs: number;
+  };
+  patterns: PatternRow[];
 }
 
 export interface SearchEntry {
@@ -184,6 +242,7 @@ export const getBills = () => loadJson<BillSummary[]>('bills.json');
 export const getAwards = () => loadJson<Award[]>('awards.json');
 export const getSearchIndex = () => loadJson<SearchEntry[]>('search.json');
 export const getOverlaps = () => loadJson<OverlapResult[]>('overlaps.json');
+export const getPatterns = () => loadJson<PatternsFile>('patterns.json');
 
 /**
  * The curated featured set, or `null` when the bundle predates it.
@@ -229,4 +288,4 @@ export async function getFeaturedSet(): Promise<FeaturedSet> {
 export const getBillDetail = (id: string) => loadJson<BillDetail>(`bill/${id}.json`);
 export const getMemberDetail = (id: string) => loadJson<MemberDetail>(`member/${id}.json`);
 
-export type { Award, DonorProfile, Industry, IndustryId, OverlapResult, VoteRecord };
+export type { Award, DonorProfile, Industry, IndustryId, OverlapResult, Pattern, PatternVerdict, PlainBill, PlainConfidence, VoteRecord };

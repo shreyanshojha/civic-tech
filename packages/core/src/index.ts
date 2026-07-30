@@ -4,5 +4,7 @@ export * from './industries.js';
 export * from './org-knowledge.js';
 export * from './policy-areas.js';
 export * from './meaning.js';
+export * from './plain-bill.js';
 export * from './overlap.js';
+export * from './patterns.js';
 export * from './format.js';

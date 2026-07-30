@@ -232,6 +232,19 @@ export function classifyBillMetadata(
 const CEREMONIAL_TITLE_PATTERNS: RegExp[] = [
   /\b(express(ing|es)?)\s+(the\s+)?(sense|condolences|sympathy|gratitude|support|solidarity|appreciation)\b/i,
   /\bcongratulat(ing|es|e)\b/i,
+  /\bcommend(ing|s)\b/i,
+  // "Recognizing" is deliberately NOT matched on its own. It opens honorific
+  // resolutions ("Recognizing the 250th anniversary of…") and substantive
+  // sense-of-Congress resolutions alike ("Recognizing the duty of the Federal
+  // Government to…"). The second kind changes no law but is genuinely about
+  // policy, and filing it as a tribute would drop it from every sector tag on
+  // the site — the same class of mistake that hid the arms-sale disapprovals.
+  // So it is matched only with an honorific object.
+  //
+  // This matters in practice: 24 of the 26 Recognizing/Commending measures in
+  // this dataset carry NO subject terms at all, so the subject-term check above
+  // — which is what catches most tributes — never sees them.
+  /\brecogniz(ing|es)\b.{0,60}\b(anniversary|centennial|bicentennial|sesquicentennial|birthday|legacy|heritage|contributions|achievements|sacrifice|dedicated service|years of service)\b/i,
   /\bhonor(ing|s)?\s+(the\s+)?(life|memory|service|contributions|legacy|sacrifice)\b/i,
   /\bcommemorat(ing|es|e)\b/i,
   /\brecogniz(ing|es|e)\s+(the\s+)?(importance|contributions|anniversary|achievements|role|service|significance)\b/i,
@@ -281,21 +294,54 @@ export function isCeremonialMeasure(
   policyArea?: string | null,
   subjects: string[] = [],
 ): CeremonialCheck {
+  const t = (title ?? '').trim();
+  if (!t) return { ceremonial: false, reason: null };
+
+  // ---------------------------------------------------------------------
+  // A RESOLUTION OF DISAPPROVAL IS NEVER CEREMONIAL.
+  //
+  // This check MUST come first — before the subject terms and before every
+  // title pattern — and it must not require any particular object.
+  //
+  // Two bugs lived here, and both were invisible because they produced silence
+  // rather than a wrong answer on screen.
+  //
+  // First, the exemption matched `congressional disapproval of the rule`. No
+  // real title contains that phrase: every Congressional Review Act resolution
+  // reads "congressional disapproval UNDER CHAPTER 8 OF TITLE 5, UNITED STATES
+  // CODE, of the rule submitted by…". The words never sat adjacent, so the
+  // exemption never fired once in 254 measures.
+  //
+  // Second, and worse, narrowing it to rules at all was the wrong shape. The
+  // remaining 35 were arms-sale disapprovals — "Providing for congressional
+  // disapproval of the proposed foreign military sale to Turkey of certain
+  // defense articles and services" — filed by the procedural patterns as
+  // internal housekeeping. Those are the most defence-relevant measures in the
+  // entire dataset, and they were the ones being dropped from every sector tag,
+  // every overlap score and every cohort comparison on the site.
+  //
+  // The general rule is simpler and safer than any list of objects: a
+  // disapproval resolution exists to stop something concrete — a federal rule,
+  // a weapons sale, a declared emergency. That is the opposite of ceremonial.
+  // If a future disapproval target is invented, this still handles it.
+  //
+  // Ordering is load-bearing: an "Awards and medals" subject term attached to
+  // an omnibus must not outvote this.
+  // ---------------------------------------------------------------------
+  if (/\bcongressional disapproval\b/i.test(t)) {
+    return { ceremonial: false, reason: null };
+  }
+
   // The Library of Congress labels these directly. An audit found 18 tribute
   // and commemorative resolutions still being sector-tagged and scored because
   // their titles did not match any phrase pattern — including a memorial for
   // police officers killed in the line of duty, which was tagged "Lawyers &
   // Lobbyists" and offered a share button. The subject term is authoritative;
-  // check it first.
+  // check it before the title patterns.
   const CEREMONIAL_SUBJECTS = /congressional tributes|commemorative (event|holiday)|anniversaries|awards and medals|memorials/i;
   if (subjects.some((s) => CEREMONIAL_SUBJECTS.test(s))) {
     return { ceremonial: true, reason: 'measure the Library of Congress labels as a congressional tribute or commemoration' };
   }
-  const t = (title ?? '').trim();
-  if (!t) return { ceremonial: false, reason: null };
-
-  // CRA disapproval resolutions are substantive. Check before anything else.
-  if (/\bcongressional disapproval of the rule\b/i.test(t)) return { ceremonial: false, reason: null };
 
   for (const re of CEREMONIAL_TITLE_PATTERNS) {
     const m = re.exec(t);

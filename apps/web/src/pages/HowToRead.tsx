@@ -141,6 +141,22 @@ export default function HowToRead() {
           place, so this site does that, and links every number back to the filing it came from.
         </p>
 
+        {/* The honest answer to "what can I learn here" is: not much from one
+            member's page, because one member's share of one sector is a number
+            with a sample size of one. The committee view is the only place on
+            this site where the comparison has a sample size, so the reading guide
+            has to send people there rather than let them conclude the site has
+            nothing to offer. */}
+        <p className="mt-3 max-w-measure text-base leading-relaxed text-ink-2">
+          There is one more question, and it is the one with real numbers behind it.{' '}
+          <Link className="link font-medium text-ink-1" to="/patterns">
+            Committees
+          </Link>{' '}
+          compares a whole committee with the members of the same chamber who are not on it. One
+          member's percentage tells you very little on its own. Fifty of them, next to four hundred
+          others, can be tested — and that page shows every test, including the ones that failed.
+        </p>
+
         <h3 className="mt-6 text-base font-semibold text-ink-0">Two things it cannot answer</h3>
         <ul className="mt-2 max-w-measure space-y-2 text-base leading-snug text-ink-2">
           <li>

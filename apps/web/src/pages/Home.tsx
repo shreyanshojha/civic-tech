@@ -185,7 +185,15 @@ export default function Home() {
               the three original doors keep their grid. It is deliberately not
               dressed up as a notice or a callout: a first-time visitor should be
               able to pick it as easily as any other starting point. */}
-          <div className="mt-3">
+          {/* The fifth door is the committee comparisons, and it is a door for
+              the same reason the guide is. The three doors above all land a
+              reader on ONE member or ONE bill, and at that resolution there is
+              almost nothing to learn — one member's share of one sector is a
+              number with a sample size of one. The committee view is the only
+              place on this site where a comparison has a sample size, so a
+              reader who wants to learn something needs to be able to find it
+              from the front page rather than from the nav bar alone. */}
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <EntryCard
               to="/how-to-read"
               title="New here? Start with how to read this"
@@ -195,6 +203,21 @@ export default function Home() {
                   <circle cx="10" cy="10" r="7.2" />
                   <path d="M8 7.8a2 2 0 1 1 2.6 1.9c-.4.15-.6.5-.6.95v.6" strokeLinecap="round" />
                   <path d="M10 14.2v.1" strokeLinecap="round" />
+                </svg>
+              }
+            />
+            <EntryCard
+              to="/patterns"
+              title="Compare a committee with everyone else"
+              line="Every committee was tested against every sector. See the few gaps that survived every check."
+              icon={
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <circle cx="6" cy="6.5" r="1.6" />
+                  <circle cx="11" cy="6.5" r="1.6" />
+                  <circle cx="15.5" cy="6.5" r="1.6" />
+                  <circle cx="4.5" cy="13.5" r="1.6" />
+                  <circle cx="8" cy="13.5" r="1.6" />
+                  <path d="M2.5 10h15" strokeLinecap="round" />
                 </svg>
               }
             />

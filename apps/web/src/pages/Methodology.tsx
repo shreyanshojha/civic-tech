@@ -302,6 +302,41 @@ export default function Methodology() {
             </p>
           </div>
         </div>
+        {/* ---- what "in plain words" can and cannot cover -------------------
+            The numbers come out of the bundle, so this paragraph describes THIS
+            dataset. Most bills land in the title-only column and the page says
+            so: a reader who is told "we explain bills in plain words" and then
+            meets 730 bills we cannot explain should have been warned here
+            first. */}
+        {idx && (idx.counts.plainCrsSummary ?? 0) + (idx.counts.plainTitleOnly ?? 0) > 0 && (
+          <div className="mt-4 card p-4">
+            <div className="label mb-1.5">Step 3b — the plain-language explanation, and how far it reaches</div>
+            <p className="text-sm leading-relaxed text-ink-3">
+              Every bill page opens with what the bill would do, who it reaches and what would change.
+              That is generated at build time by a deterministic rewriter in{' '}
+              <span className="mono">@ftm/core</span> — no language model, no key — and it can only be
+              as good as the text it is given. Of{' '}
+              <span className="tnum">{idx.counts.bills.toLocaleString()}</span> measures in this
+              bundle:{' '}
+              <span className="tnum">{(idx.counts.plainCrsSummary ?? 0).toLocaleString()}</span> are
+              described from a published Congressional Research Service summary;{' '}
+              <span className="tnum">{(idx.counts.plainTitleOnly ?? 0).toLocaleString()}</span> have no
+              summary at all, so the page says only the title exists and points at the bill rather than
+              paraphrasing a title into a description of a law; and{' '}
+              <span className="tnum">{(idx.counts.plainCeremonial ?? 0).toLocaleString()}</span> are
+              tributes, building namings or Congress's own housekeeping, which change no law and are
+              labelled as such.
+            </p>
+            <CoverageNote>
+              The title-only group is the largest of the three. That is a limit of the public record,
+              not a setting: for those bills the only text Congress has published is a title, and often
+              only a short title like “SHARE Act of 2025”, which describes nothing. The audience line —
+              who a bill reaches — is derived from Library of Congress subject labels and is available
+              for most bills either way.
+            </CoverageNote>
+          </div>
+        )}
+
         <p className="mt-3 max-w-measure-wide text-xs leading-relaxed text-ink-4">
           Whichever path ran, the confidence attached to a tag is the classifier's own self-assessment.
           It is not a measured probability, not a statistical guarantee, and not validated against a

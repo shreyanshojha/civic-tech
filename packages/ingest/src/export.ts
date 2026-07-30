@@ -31,9 +31,10 @@ import {
   INDUSTRIES,
   OVERLAP_FORMULA,
   computeOverlap,
+  explainBillPlainly,
   findOrdinaryExplanations,
 } from '@ftm/core/src';
-import type { BillClassification, DonorProfile, IndustryId, OverlapResult } from '@ftm/core/src';
+import type { BillClassification, DonorProfile, IndustryId, OverlapResult, PlainBill } from '@ftm/core/src';
 import { CONFIG, MOBILE_DATA_DIR, WEB_DATA_DIR, isMain } from './lib/env.js';
 import { db, getMeta } from './lib/db.js';
 
@@ -137,6 +138,30 @@ interface BillRow {
 }
 
 interface DonorRow { name: string; industry: string; amount: number; kind: string; sourceUrl: string }
+
+/**
+ * The plain-language explanation of one bill, computed HERE rather than in the
+ * browser.
+ *
+ * Same reasoning as `meaningFactsFor` below: the sentences a reader is asked to
+ * trust about what a law does are generated once, at build time, from a pure
+ * function in @ftm/core, and shipped as text. A page cannot then produce a
+ * different explanation from the one the pipeline produced, and the wording is
+ * reviewable in the JSON without running a browser.
+ *
+ * Note what it is fed: the CRS `official_summary` when Congress.gov has one, and
+ * otherwise nothing but the title, policy area and subject labels — which for
+ * most of this dataset is all that exists.
+ */
+function plainBillFor(b: BillRow): PlainBill {
+  return explainBillPlainly({
+    title: b.title,
+    billType: b.bill_type,
+    policyArea: b.policy_area,
+    subjects: parse<string[]>(b.subjects, []),
+    officialSummary: b.official_summary,
+  });
+}
 
 /**
  * Collapses filing artefacts out of the donor table.
@@ -534,6 +559,14 @@ export async function exportBundle(): Promise<void> {
       industries: cls?.industries.map((i) => ({ industry: i.industry, confidence: i.confidence, rationale: i.rationale })) ?? [],
       plainSummary: cls?.plainSummary?.slice(0, 900) ?? null,
       classificationMethod: cls?.method ?? null,
+      // The list needs one sentence, not the whole explanation: who a bill
+      // reaches is far more use to a reader scanning 1,478 rows than the CRS
+      // policy-area string, which is a filing category. The tier travels with
+      // it so a row can be honest about how much is actually known.
+      plain: (() => {
+        const p = plainBillFor(b);
+        return { whoItTouches: p.whoItTouches, confidence: p.confidence };
+      })(),
       topOverlap: list[0] ? { bioguideId: list[0].bioguideId, score: list[0].score } : null,
       overlapCount: list.length,
     };
@@ -557,6 +590,8 @@ export async function exportBundle(): Promise<void> {
         source: 'congress', sourceUrl: b.source_url, fetchedAt: b.fetched_at,
       },
       classification: cls ?? null,
+      // First thing on the page, ahead of the sector tags and the money.
+      plain: plainBillFor(b),
       overlaps: list.map((o) => ({
         ...o,
         member: legByBio.get(o.bioguideId)
@@ -883,6 +918,23 @@ export async function exportBundle(): Promise<void> {
       : `${votes.length} House roll-call votes included.`,
   ];
 
+  /**
+   * How many bills this site can actually explain.
+   *
+   * Reported rather than hidden. Only bills with a published Congressional
+   * Research Service summary get a real description of what they would do; for
+   * the rest the only text in existence is a title, and often only a marketing
+   * short title like "SHARE Act of 2025". The Methodology page prints this split
+   * from these counts, so the claim on the page is the pipeline's own tally and
+   * cannot drift from it.
+   */
+  const plainCoverage = { 'crs-summary': 0, 'title-only': 0, ceremonial: 0 };
+  for (const b of billRows) plainCoverage[plainBillFor(b).confidence]++;
+  console.log(
+    `  plain-language coverage: ${plainCoverage['crs-summary']} explained from a CRS summary, ` +
+    `${plainCoverage['title-only']} title-only (no summary exists), ${plainCoverage.ceremonial} ceremonial or procedural`,
+  );
+
   const index = {
     generatedAt: now(),
     isSample: false,
@@ -909,6 +961,9 @@ export async function exportBundle(): Promise<void> {
       votes: votes.length,
       awards: awards.length,
       committeeSeats: committeeRows.length,
+      plainCrsSummary: plainCoverage['crs-summary'],
+      plainTitleOnly: plainCoverage['title-only'],
+      plainCeremonial: plainCoverage.ceremonial,
     },
     sources: {
       openfec: getMeta('fec_mode') ?? 'bulk',

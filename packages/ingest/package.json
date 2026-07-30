@@ -10,6 +10,7 @@
     "usaspending": "tsx src/usaspending.ts",
     "districts": "tsx src/districts.ts",
     "classify": "tsx src/classify.ts",
+    "patterns": "tsx src/patterns.ts",
     "export": "tsx src/export.ts",
     "sample": "tsx src/make-sample.ts",
     "test": "vitest run",

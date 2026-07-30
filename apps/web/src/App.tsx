@@ -23,6 +23,8 @@ const RepDetailPage = lazy(() => import('./pages/RepDetail'));
 const IndustriesPage = lazy(() => import('./pages/Industries'));
 const IndustryDetailPage = lazy(() => import('./pages/IndustryDetail'));
 const SpendingPage = lazy(() => import('./pages/Spending'));
+const PatternsPage = lazy(() => import('./pages/Patterns'));
+const PatternDetailPage = lazy(() => import('./pages/PatternDetail'));
 const HowToReadPage = lazy(() => import('./pages/HowToRead'));
 const MethodologyPage = lazy(() => import('./pages/Methodology'));
 const LimitationsPage = lazy(() => import('./pages/Limitations'));
@@ -43,11 +45,18 @@ const AboutPage = lazy(() => import('./pages/About'));
  * It is in the primary nav rather than the footer for the same reason `About`
  * is — a reader who cannot tell what the site is for gives up long before they
  * reach the bottom of a page, which is exactly the failure this page fixes.
+ *
+ * `Committees` sits with the other data views rather than with the explainers,
+ * because it is a data view — the only one on this site whose unit is a group of
+ * members instead of a single member or a single bill. That is also why it earns
+ * a nav slot at all: a reader who cannot learn anything from one member's page
+ * has nowhere else to go for a comparison that has a sample size.
  */
 const NAV = [
   { to: '/bills', label: 'Bills' },
   { to: '/reps', label: 'Representatives' },
   { to: '/industries', label: 'Sectors' },
+  { to: '/patterns', label: 'Committees' },
   { to: '/spending', label: 'Federal spending' },
   { to: '/how-to-read', label: 'How to read this' },
   { to: '/methodology', label: 'Method' },
@@ -358,6 +367,8 @@ function Shell() {
             <Route path="/industries" element={<IndustriesPage />} />
             <Route path="/industries/:id" element={<IndustryDetailPage />} />
             <Route path="/spending" element={<SpendingPage />} />
+            <Route path="/patterns" element={<PatternsPage />} />
+            <Route path="/patterns/:id" element={<PatternDetailPage />} />
             <Route path="/how-to-read" element={<HowToReadPage />} />
             <Route path="/methodology" element={<MethodologyPage />} />
             <Route path="/limitations" element={<LimitationsPage />} />

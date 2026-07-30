@@ -28,7 +28,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  INDUSTRY_BY_ID, billLabel as fmtBillLabel, describeOverlap, measureType, plainAmount, plainShare, shortDate, usd,
+  INDUSTRY_BY_ID, PLAIN_BILL_FRAMING, billLabel as fmtBillLabel, describeOverlap, measureType,
+  plainAmount, plainShare, shortDate, usd,
 } from '@ftm/core';
 import { getBillDetail, getLegislators } from '../lib/data';
 import { useAsync } from '../lib/hooks';
@@ -64,6 +65,9 @@ export default function BillDetail() {
   }
 
   const { bill, classification, overlaps, votes } = data;
+  // Generated in the export step by `explainBillPlainly`, never here. Optional
+  // so a bundle built before this existed still renders.
+  const plain = data.plain ?? null;
   const isKeywordOnly = classification?.method === 'keyword-fallback';
   const prettyLabel = fmtBillLabel(bill.billType, bill.billNumber);
   const measure = measureType(bill.billType);
@@ -124,28 +128,68 @@ export default function BillDetail() {
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-8">
-          {/* ---- 1. what it does, first ---------------------------------- */}
+          {/* ---- 1. what it does, in plain words, first ------------------- */}
           <section>
-            <SectionTitle note={<MethodTag method={classification?.method} />}>What this bill does</SectionTitle>
-            {classification && summaryParas.length > 0 ? (
-              <>
-                <p className="max-w-measure text-md leading-relaxed text-ink-0">{summaryParas[0]}</p>
-                {summaryParas.slice(1).map((p, i) => (
-                  <p key={i} className="mt-2 max-w-measure text-base leading-relaxed text-ink-2">{p}</p>
-                ))}
-                {classification.method === 'llm' && (
-                  <p className="mt-2 text-xs text-ink-3">
-                    Rewritten by {classification.model} from the official summary. A machine wrote it,
-                    so it can be wrong. The real text is{' '}
-                    <SourceLink href={bill.congressDotGovUrl}>the bill itself</SourceLink>.
-                  </p>
-                )}
-              </>
+            <SectionTitle>In plain words</SectionTitle>
+            {plain ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="label mb-1">What it does</h3>
+                  {/* When only the title exists, the honest sentence IS a
+                      data-gap notice, so it goes in amber — the one meaning
+                      amber has under principle 1 of styles.css — rather than
+                      being dressed up as a description or hidden. */}
+                  {plain.confidence === 'title-only' ? (
+                    <CoverageNote>{plain.whatItDoes}</CoverageNote>
+                  ) : (
+                    <p className="max-w-measure text-md leading-relaxed text-ink-0">{plain.whatItDoes}</p>
+                  )}
+                  {plain.titleInPlainWords && (
+                    <div className="mt-3">
+                      <h4 className="label mb-1">{PLAIN_BILL_FRAMING.titleRestatementLead}</h4>
+                      <p className="max-w-measure text-base leading-relaxed text-ink-2">
+                        {plain.titleInPlainWords}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h3 className="label mb-1">Who it touches</h3>
+                  <p className="max-w-measure text-md leading-relaxed text-ink-0">{plain.whoItTouches}</p>
+                </div>
+                <div>
+                  <h3 className="label mb-1">What would change</h3>
+                  <p className="max-w-measure text-base leading-relaxed text-ink-1">{plain.everydayEffect}</p>
+                </div>
+                <p className="max-w-measure-wide text-xs leading-relaxed text-ink-3">
+                  {plain.source}{' '}
+                  <SourceLink href={bill.congressDotGovUrl}>Read the bill itself</SourceLink>
+                </p>
+              </div>
             ) : (
               <Empty>
                 Nobody has written a plain summary of this bill yet. You can still read the official
                 text on Congress.gov, linked at the top of this page.
               </Empty>
+            )}
+
+            {/* The machine-written paraphrase, when a reader configured a key of
+                their own. It is NOT shown on the keyword path: there, the stored
+                "plain summary" is a verbatim copy of the legal title, and the
+                legal title is already printed in the fold below. Showing it
+                twice, once under a heading promising plain English, is the
+                register laundering this page was rebuilt to stop. */}
+            {classification?.method === 'llm' && summaryParas.length > 0 && (
+              <Fold className="mt-4" open={!isQuick} title="A language model's summary of this bill">
+                {summaryParas.map((p, i) => (
+                  <p key={i} className="max-w-measure text-base leading-relaxed text-ink-2">{p}</p>
+                ))}
+                <p className="mt-2 text-xs text-ink-3">
+                  Rewritten by {classification.model} from the official summary. A machine wrote it,
+                  so it can be wrong. The real text is{' '}
+                  <SourceLink href={bill.congressDotGovUrl}>the bill itself</SourceLink>.
+                </p>
+              </Fold>
             )}
 
             <Fold className="mt-4" open={!isQuick} title="The official title, in legal wording">
@@ -167,7 +211,13 @@ export default function BillDetail() {
 
           {/* ---- 2. sectors, as big chips -------------------------------- */}
           <section>
-            <SectionTitle>Industries this bill would affect</SectionTitle>
+            {/* The method tag belongs HERE, on the sector tags, which is what the
+                classifier actually produced. It used to sit on the summary
+                heading, where it implied the classifier had written the
+                summary. */}
+            <SectionTitle note={<MethodTag method={classification?.method} />}>
+              Industries this bill would affect
+            </SectionTitle>
             {!classification || classification.industries.length === 0 ? (
               <CoverageNote>
                 We could not tie this bill to any industry. For naming bills, ceremonial
